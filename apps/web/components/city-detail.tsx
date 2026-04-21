@@ -27,21 +27,39 @@ type OpenMeteoDaily = {
   temperature_2m_min: number[];
   weather_code: number[];
   precipitation_probability_max?: number[];
+  sunrise?: string[];
+  sunset?: string[];
+  uv_index_max?: number[];
 };
 
 type OpenMeteoCurrent = {
   temperature_2m: number;
   apparent_temperature: number;
+  dew_point_2m?: number;
   relative_humidity_2m: number;
   precipitation: number | null;
   wind_speed_10m: number;
   weather_code: number;
   is_day: number | boolean;
+  cloud_cover?: number;
+  surface_pressure?: number;
+  uv_index?: number;
+  visibility?: number;
+};
+
+type OpenMeteoHourly = {
+  time: string[];
+  temperature_2m: number[];
+  apparent_temperature: number[];
+  precipitation_probability: number[];
+  wind_speed_10m: number[];
+  weather_code: number[];
 };
 
 type OpenMeteoForecast = {
   current?: OpenMeteoCurrent;
   daily?: OpenMeteoDaily;
+  hourly?: OpenMeteoHourly;
 };
 
 function formatDayLabel(value: string) {
@@ -50,6 +68,31 @@ function formatDayLabel(value: string) {
     month: "short",
     day: "numeric",
   }).format(new Date(value));
+}
+
+function formatHourLabel(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+  }).format(new Date(value));
+}
+
+function formatShortTime(value?: string) {
+  if (!value) {
+    return "--";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatVisibility(valueMeters?: number | null) {
+  if (valueMeters == null) {
+    return "--";
+  }
+
+  return `${(valueMeters / 1000).toFixed(1)} km`;
 }
 
 export function CityDetail({ cityId }: { cityId: string }) {
@@ -147,11 +190,26 @@ export function CityDetail({ cityId }: { cityId: string }) {
       [
         "temperature_2m",
         "apparent_temperature",
+        "dew_point_2m",
         "relative_humidity_2m",
         "precipitation",
         "wind_speed_10m",
         "weather_code",
         "is_day",
+        "cloud_cover",
+        "surface_pressure",
+        "uv_index",
+        "visibility",
+      ].join(","),
+    );
+    forecastUrl.searchParams.set(
+      "hourly",
+      [
+        "temperature_2m",
+        "apparent_temperature",
+        "precipitation_probability",
+        "wind_speed_10m",
+        "weather_code",
       ].join(","),
     );
     forecastUrl.searchParams.set(
@@ -161,6 +219,9 @@ export function CityDetail({ cityId }: { cityId: string }) {
         "temperature_2m_min",
         "weather_code",
         "precipitation_probability_max",
+        "sunrise",
+        "sunset",
+        "uv_index_max",
       ].join(","),
     );
     forecastUrl.searchParams.set("forecast_days", "5");
@@ -269,6 +330,27 @@ export function CityDetail({ cityId }: { cityId: string }) {
     snapshot?.wind_speed_kph ?? forecast?.current?.wind_speed_10m ?? null;
   const currentPrecipitation =
     snapshot?.precipitation_mm ?? forecast?.current?.precipitation ?? 0;
+  const currentCloudCover = forecast?.current?.cloud_cover ?? null;
+  const currentPressure = forecast?.current?.surface_pressure ?? null;
+  const currentVisibility = forecast?.current?.visibility ?? null;
+  const currentUv = forecast?.current?.uv_index ?? null;
+  const currentDewPoint = forecast?.current?.dew_point_2m ?? null;
+  const hourly = forecast?.hourly;
+  const nextHourlyRows =
+    hourly?.time.slice(0, 8).map((time, index) => ({
+      time,
+      temperatureC: hourly.temperature_2m[index],
+      apparentTemperatureC: hourly.apparent_temperature[index],
+      precipitationProbability: hourly.precipitation_probability[index],
+      windSpeed: hourly.wind_speed_10m[index],
+      weatherCode: hourly.weather_code[index],
+    })) ?? [];
+  const todayHigh = daily?.temperature_2m_max[0] ?? null;
+  const todayLow = daily?.temperature_2m_min[0] ?? null;
+  const todayRainChance = daily?.precipitation_probability_max?.[0] ?? null;
+  const sunrise = daily?.sunrise?.[0];
+  const sunset = daily?.sunset?.[0];
+  const maxUv = daily?.uv_index_max?.[0] ?? null;
 
   return (
     <section className="space-y-10 py-8">
@@ -382,6 +464,140 @@ export function CityDetail({ cityId }: { cityId: string }) {
           </div>
         </div>
       </div>
+
+      <section className="space-y-4">
+        <div>
+          <p className="eyebrow">Highlights</p>
+          <h3 className="mt-3 text-2xl font-medium tracking-tight">
+            Today at a glance
+          </h3>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <article className="card-shell-strong p-5">
+            <p className="eyebrow mb-3">High / Low</p>
+            <div className="text-3xl font-medium tracking-tight">
+              {todayHigh != null ? formatTemperature(todayHigh, preferredUnit) : "--"}
+            </div>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              Low {todayLow != null ? formatTemperature(todayLow, preferredUnit) : "--"}
+            </p>
+          </article>
+          <article className="card-shell-strong p-5">
+            <p className="eyebrow mb-3">Sun</p>
+            <div className="text-3xl font-medium tracking-tight">
+              {formatShortTime(sunrise)}
+            </div>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              Sunset {formatShortTime(sunset)}
+            </p>
+          </article>
+          <article className="card-shell-strong p-5">
+            <p className="eyebrow mb-3">Air + Sky</p>
+            <div className="text-3xl font-medium tracking-tight">
+              {currentCloudCover != null ? `${Math.round(currentCloudCover)}%` : "--"}
+            </div>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              Cloud cover
+            </p>
+          </article>
+          <article className="card-shell-strong p-5">
+            <p className="eyebrow mb-3">UV + Rain</p>
+            <div className="text-3xl font-medium tracking-tight">
+              {maxUv != null ? Math.round(maxUv).toString() : "--"}
+            </div>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              Rain chance {todayRainChance != null ? `${todayRainChance}%` : "--"}
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <p className="eyebrow">Hourly</p>
+          <h3 className="mt-3 text-2xl font-medium tracking-tight">
+            Next 8 hours
+          </h3>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-8">
+          {nextHourlyRows.map((row) => {
+            const hourlyCondition = describeWeatherCode(row.weatherCode);
+            return (
+              <article className="card-shell-strong flex flex-col gap-3 p-4" key={row.time}>
+                <p className="text-sm text-[var(--ink-soft)]">{formatHourLabel(row.time)}</p>
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <span
+                    className="pill-dot"
+                    style={{ backgroundColor: hourlyCondition.accent }}
+                  />
+                  <span className="truncate">{hourlyCondition.label}</span>
+                </div>
+                <div className="text-2xl font-medium tracking-tight">
+                  {formatTemperature(row.temperatureC, preferredUnit)}
+                </div>
+                <div className="space-y-1 text-xs text-[var(--ink-soft)]">
+                  <p>Feels {formatTemperature(row.apparentTemperatureC, preferredUnit)}</p>
+                  <p>Rain {row.precipitationProbability}%</p>
+                  <p>Wind {formatWind(row.windSpeed)}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <p className="eyebrow">Metrics</p>
+          <h3 className="mt-3 text-2xl font-medium tracking-tight">
+            Additional details
+          </h3>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            {
+              label: "Humidity",
+              value: currentHumidity != null ? `${Math.round(currentHumidity)}%` : "--",
+            },
+            {
+              label: "Wind",
+              value: currentWind != null ? formatWind(currentWind) : "--",
+            },
+            {
+              label: "Visibility",
+              value: formatVisibility(currentVisibility),
+            },
+            {
+              label: "Pressure",
+              value: currentPressure != null ? `${Math.round(currentPressure)} hPa` : "--",
+            },
+            {
+              label: "UV Index",
+              value: currentUv != null ? currentUv.toFixed(1) : "--",
+            },
+            {
+              label: "Dew Point",
+              value: currentDewPoint != null ? formatTemperature(currentDewPoint, preferredUnit) : "--",
+            },
+            {
+              label: "Precipitation",
+              value: `${Number(currentPrecipitation).toFixed(1)} mm`,
+            },
+            {
+              label: "Coordinates",
+              value: `${city.latitude.toFixed(2)}, ${city.longitude.toFixed(2)}`,
+            },
+          ].map((metric) => (
+            <article className="card-shell-strong p-5" key={metric.label}>
+              <p className="eyebrow mb-3">{metric.label}</p>
+              <div className="text-2xl font-medium tracking-tight">{metric.value}</div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       {daily ? (
         <section className="space-y-4">

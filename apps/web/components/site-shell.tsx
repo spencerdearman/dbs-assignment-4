@@ -2,23 +2,12 @@
 
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { hasEnv, isReady, isSignedIn, missingEnv, signOut, userEmail } =
-    useAuth();
-  const [signingOut, setSigningOut] = useState(false);
-
-  async function handleSignOut() {
-    setSigningOut(true);
-    await signOut();
-    setSigningOut(false);
-    router.push("/");
-  }
+  const { hasEnv, isReady, isSignedIn, missingEnv } = useAuth();
 
   const navItems = [
     { href: "/", label: "Dashboard" },
@@ -53,20 +42,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             ) : !isReady ? (
               <span>Connecting</span>
             ) : isSignedIn ? (
-              <>
-                <Link
-                  className="transition-colors hover:text-white"
-                  href="/auth"
-                >
-                  {userEmail}
-                </Link>
-                <Link
-                  className="transition-colors hover:text-white"
-                  href="/auth"
-                >
-                  Account
-                </Link>
-              </>
+              <UserButton />
             ) : (
               <Link
                 className="transition-colors hover:text-white"
@@ -75,20 +51,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 Sign in
               </Link>
             )}
-
-            {isReady && hasEnv && isSignedIn ? (
-              <div className="flex items-center gap-3">
-                <UserButton />
-                <button
-                  className="text-white/70 transition-colors hover:text-white"
-                  disabled={signingOut}
-                  onClick={handleSignOut}
-                  type="button"
-                >
-                  {signingOut ? "Signing out" : "Sign out"}
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
       </header>
