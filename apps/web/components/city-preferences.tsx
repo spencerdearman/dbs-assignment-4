@@ -176,6 +176,49 @@ export function CityPreferences() {
     const haystack = `${city.name} ${city.region} ${city.country}`.toLowerCase();
     return haystack.includes(normalizedSearch);
   });
+  const savedCities = filteredCities.filter((city) => favoriteIds.includes(city.id));
+  const availableCities = filteredCities.filter(
+    (city) => !favoriteIds.includes(city.id),
+  );
+
+  function renderCityRow(city: CityRecord, isFavorite: boolean) {
+    return (
+      <article
+        className="flex flex-col justify-between gap-4 py-6 transition-colors md:flex-row md:items-center hover:bg-[var(--surface-strong)]"
+        key={city.id}
+      >
+        <div className="w-full md:w-2/3">
+          <h4 className="text-xl font-medium tracking-tight">
+            <Link className="transition-colors hover:opacity-60" href={`/cities/${city.id}`}>
+              {city.name}
+            </Link>
+          </h4>
+          <div className="mt-2 text-sm text-[var(--ink-soft)]">
+            {city.region}, {city.country} · {city.latitude.toFixed(4)},{" "}
+            {city.longitude.toFixed(4)}
+          </div>
+        </div>
+        <div className="flex md:justify-end w-full md:w-1/3">
+          <button
+            className={`rounded-full border px-5 py-2 text-sm transition-colors ${
+              isFavorite
+                ? "bg-[var(--ink)] border-[var(--ink)] text-white hover:opacity-80"
+                : "bg-transparent border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-white"
+            }`}
+            disabled={busyCityId === city.id}
+            onClick={() => void toggleFavorite(city.id)}
+            type="button"
+          >
+            {busyCityId === city.id
+              ? "Saving..."
+              : isFavorite
+                ? "- Remove"
+                : "+ Save"}
+          </button>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <section className="space-y-16">
@@ -187,8 +230,10 @@ export function CityPreferences() {
           </p>
         </div>
         <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Minimum</p>
-          <p className="text-4xl font-semibold tracking-tighter">3</p>
+          <p className="eyebrow mb-2">Available</p>
+          <p className="text-4xl font-semibold tracking-tighter">
+            {cities.length - favoriteIds.length}
+          </p>
         </div>
         <div className="card-shell-strong col-span-2 p-5">
           <p className="eyebrow mb-2">Unit Preference</p>
@@ -241,48 +286,41 @@ export function CityPreferences() {
         </div>
       ) : null}
 
-      <div className="flex flex-col divide-y divide-[var(--border)] border-b border-[var(--border)]">
-        {filteredCities.map((city) => {
-          const isFavorite = favoriteIds.includes(city.id);
+      <section className="space-y-8">
+        <div>
+          <p className="eyebrow mb-3">Saved</p>
+          <div className="flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
+            {savedCities.length > 0 ? (
+              savedCities.map((city) => renderCityRow(city, true))
+            ) : (
+              <div className="py-10 text-sm text-[var(--ink-soft)]">
+                No saved cities yet. Add a few below to personalize your dashboard.
+              </div>
+            )}
+          </div>
+        </div>
 
-          return (
-            <article
-              className="flex flex-col justify-between gap-4 py-6 transition-colors md:flex-row md:items-center hover:bg-[var(--surface-strong)]"
-              key={city.id}
-            >
-              <div className="w-full md:w-2/3">
-                <h4 className="text-xl font-medium tracking-tight">
-                  <Link className="transition-colors hover:opacity-60" href={`/cities/${city.id}`}>
-                    {city.name}
-                  </Link>
-                </h4>
-                <div className="mt-2 text-sm text-[var(--ink-soft)]">
-                  {city.region}, {city.country} · {city.latitude.toFixed(4)},{" "}
-                  {city.longitude.toFixed(4)}
-                </div>
+        <div>
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="eyebrow mb-3">Add More</p>
+              <p className="text-sm text-[var(--ink-soft)]">
+                Browse the remaining cities and add them to your dashboard.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
+            {availableCities.length > 0 ? (
+              availableCities.map((city) => renderCityRow(city, false))
+            ) : (
+              <div className="py-10 text-sm text-[var(--ink-soft)]">
+                No additional cities match your current search.
               </div>
-              <div className="flex md:justify-end w-full md:w-1/3">
-                <button
-                  className={`rounded-full border px-5 py-2 text-sm transition-colors ${
-                    isFavorite
-                      ? "bg-[var(--ink)] border-[var(--ink)] text-white hover:opacity-80"
-                      : "bg-transparent border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-white"
-                  }`}
-                  disabled={busyCityId === city.id}
-                  onClick={() => void toggleFavorite(city.id)}
-                  type="button"
-                >
-                  {busyCityId === city.id
-                    ? "Saving..."
-                    : isFavorite
-                      ? "− Remove"
-                      : "+ Save"}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        </div>
+      </section>
     </section>
   );
 }

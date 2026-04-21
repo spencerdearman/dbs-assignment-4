@@ -1,14 +1,16 @@
 import { SiteShell } from "@/components/site-shell";
 import { CityDetail } from "@/components/city-detail";
 
-export default function CityPage({
+export default async function CityPage({
   params,
 }: {
-  params: { cityId: string };
+  params: Promise<{ cityId: string }>;
 }) {
+  const { cityId } = await params;
+
   return (
     <SiteShell>
-      <CityDetail cityId={params.cityId} />
+      <CityDetail cityId={cityId} />
     </SiteShell>
   );
 }

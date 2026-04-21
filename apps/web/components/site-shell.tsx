@@ -23,7 +23,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", label: "Dashboard" },
     { href: "/my-cities", label: "My Cities" },
-    { href: "/auth", label: isSignedIn ? "Account" : "Sign In" },
   ];
 
   return (
@@ -49,15 +48,33 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3 text-xs text-white/70">
-            <span>
-              {!hasEnv
-                ? "Setup required"
-                : !isReady
-                  ? "Connecting"
-                  : isSignedIn
-                    ? userEmail
-                    : "Guest"}
-            </span>
+            {!hasEnv ? (
+              <span>Setup required</span>
+            ) : !isReady ? (
+              <span>Connecting</span>
+            ) : isSignedIn ? (
+              <>
+                <Link
+                  className="transition-colors hover:text-white"
+                  href="/auth"
+                >
+                  {userEmail}
+                </Link>
+                <Link
+                  className="transition-colors hover:text-white"
+                  href="/auth"
+                >
+                  Account
+                </Link>
+              </>
+            ) : (
+              <Link
+                className="transition-colors hover:text-white"
+                href="/sign-in"
+              >
+                Sign in
+              </Link>
+            )}
 
             {isReady && hasEnv && isSignedIn ? (
               <div className="flex items-center gap-3">
