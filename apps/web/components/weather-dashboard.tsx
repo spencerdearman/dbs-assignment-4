@@ -195,12 +195,11 @@ export function WeatherDashboard() {
 
   if (!hasEnv) {
     return (
-      <section className="card-shell px-6 py-7 sm:px-8">
-        <p className="eyebrow">Dashboard</p>
-        <h2 className="mt-3 text-2xl font-semibold">Supabase env vars are required</h2>
-        <p className="mt-4 text-sm leading-7 text-[var(--ink-soft)]">
-          Once the frontend keys are added, the dashboard will connect to public
-          weather rows and realtime updates.
+      <section className="py-8">
+        <p className="eyebrow">Dashboard Exception</p>
+        <h2 className="mt-4 text-3xl font-medium tracking-tight">Setup Required</h2>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
+          Please provide keys to continue rendering data.
         </p>
       </section>
     );
@@ -208,9 +207,9 @@ export function WeatherDashboard() {
 
   if (!isReady || loading) {
     return (
-      <section className="card-shell px-6 py-7 sm:px-8">
-        <p className="eyebrow">Dashboard</p>
-        <h2 className="mt-3 text-2xl font-semibold">Loading live weather…</h2>
+      <section className="py-8">
+        <p className="eyebrow">System</p>
+        <h2 className="mt-4 text-3xl font-medium tracking-tight">Initializing...</h2>
       </section>
     );
   }
@@ -231,193 +230,137 @@ export function WeatherDashboard() {
   const activeCitiesCount = visibleCities.filter((city) => snapshots[city.id]).length;
 
   return (
-    <section className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="card-shell px-6 py-7 sm:px-8">
-          <p className="eyebrow">Realtime feed</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-            {isSignedIn ? "Your cities, updating live." : "Featured city weather, streaming live."}
-          </h2>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
-            The worker polls Open-Meteo, writes to Supabase, and this page listens
-            for realtime database changes without refreshing.
-          </p>
-
-          <div className="mt-7 grid gap-4 sm:grid-cols-3">
-            <div className="card-shell-strong px-5 py-5">
-              <p className="eyebrow">Visible cities</p>
-              <p className="mt-3 text-3xl font-semibold">{visibleCities.length}</p>
-            </div>
-            <div className="card-shell-strong px-5 py-5">
-              <p className="eyebrow">Live rows</p>
-              <p className="mt-3 text-3xl font-semibold">{activeCitiesCount}</p>
-            </div>
-            <div className="card-shell-strong px-5 py-5">
-              <p className="eyebrow">Warmest city</p>
-              <p className="mt-3 text-xl font-semibold">
-                {hottestCity ? hottestCity.name : "Waiting"}
-              </p>
-            </div>
-          </div>
-
-          {isSignedIn ? null : (
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link className="button-primary" href="/sign-up">
-                Sign up for personalization
-              </Link>
-              <Link className="button-secondary" href="/my-cities">
-                Preview favorites page
-              </Link>
-            </div>
-          )}
+    <section className="space-y-16">
+      {/* Top Overview Bar */}
+      <div className="grid grid-cols-2 gap-8 border-b border-t border-[var(--border)] py-8 md:grid-cols-4">
+        <div>
+          <p className="eyebrow mb-2">Visible Cities</p>
+          <p className="text-4xl font-semibold tracking-tighter">{visibleCities.length}</p>
         </div>
+        <div>
+          <p className="eyebrow mb-2">Live Rows</p>
+          <p className="text-4xl font-semibold tracking-tighter">{activeCitiesCount}</p>
+        </div>
+        <div>
+          <p className="eyebrow mb-2">Warmest City</p>
+          <p className="text-4xl font-semibold tracking-tighter">
+            {hottestCity ? hottestCity.name : "N/A"}
+          </p>
+        </div>
+        <div>
+          <p className="eyebrow mb-2">Worker Status</p>
+          <p className="text-xl font-medium uppercase tracking-tight">
+            {workerStatus?.last_success_at ? "Healthy" : "Waiting"}
+          </p>
+          <p className="mt-1 font-mono text-[0.65rem] uppercase tracking-wider text-[var(--ink-soft)]">
+            {workerStatus?.last_success_at
+              ? formatRelativeTime(workerStatus.last_success_at)
+              : "No polls"}
+          </p>
+        </div>
+      </div>
 
-        <div className="card-shell px-6 py-7 sm:px-8">
-          <p className="eyebrow">System status</p>
-          <h3 className="mt-3 text-xl font-semibold">Worker and display settings</h3>
-
-          <div className="mt-6 space-y-4">
-            <div className="card-shell-strong px-5 py-5">
-              <p className="eyebrow">Worker</p>
-              <p className="mt-2 text-base font-semibold">
-                {workerStatus?.last_success_at ? "Healthy" : "Waiting for first poll"}
-              </p>
-              <p className="mt-2 text-sm leading-7 text-[var(--ink-soft)]">
-                Last success:{" "}
-                {workerStatus?.last_success_at
-                  ? formatRelativeTime(workerStatus.last_success_at)
-                  : "No successful poll yet"}
-              </p>
-              <p className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">
-                Poll interval: {workerStatus?.poll_interval_minutes ?? 15} minutes
-              </p>
-              <p className="mt-1 text-sm leading-7 text-[var(--ink-soft)]">
-                {workerStatus?.last_error ?? "No reported worker errors."}
-              </p>
-            </div>
-
-            <div className="card-shell-strong px-5 py-5">
-              <p className="eyebrow">Temperature unit</p>
-              <div className="mt-4 inline-flex rounded-full border border-[rgba(76,100,122,0.18)] bg-white/75 p-1">
-                {(["fahrenheit", "celsius"] as const).map((unit) => (
-                  <button
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                      preferredUnit === unit
-                        ? "bg-[var(--ink)] text-white"
-                        : "text-[var(--ink-soft)]"
-                    }`}
-                    key={unit}
-                    onClick={() => void updatePreferredUnit(unit)}
-                    type="button"
-                  >
-                    {unit === "fahrenheit" ? "Fahrenheit" : "Celsius"}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-                {isSignedIn
-                  ? "Saved to your user profile."
-                  : "Guests can toggle locally. Sign in with Clerk to save it."}
-              </p>
-            </div>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
+        <div>
+          <p className="eyebrow mb-2">Realtime Data</p>
+          <h2 className="text-2xl uppercase tracking-widest font-medium">
+            {isSignedIn ? "Your Subscribed Locations" : "Featured Network Feed"}
+          </h2>
+        </div>
+        
+        <div className="flex items-center gap-4 border-b border-[var(--border)] pb-2">
+          <p className="eyebrow">Unit</p>
+          <div className="flex gap-4 font-mono text-xs uppercase tracking-widest">
+            <button
+              onClick={() => void updatePreferredUnit("fahrenheit")}
+              className={`transition-colors ${preferredUnit === "fahrenheit" ? "text-[var(--ink)] font-bold" : "text-[var(--ink-soft)] hover:text-[var(--ink)]"}`}
+            >
+              °F
+            </button>
+            <button
+              onClick={() => void updatePreferredUnit("celsius")}
+              className={`transition-colors ${preferredUnit === "celsius" ? "text-[var(--ink)] font-bold" : "text-[var(--ink-soft)] hover:text-[var(--ink)]"}`}
+            >
+              °C
+            </button>
           </div>
         </div>
       </div>
 
       {error ? (
-        <div className="card-shell-strong border border-[rgba(255,143,90,0.18)] px-6 py-4 text-sm leading-7 text-[var(--ink-soft)]">
+        <div className="border border-[var(--ink)] bg-[var(--surface-strong)] px-6 py-4 font-mono text-sm uppercase tracking-wide">
           {error}
         </div>
       ) : null}
 
       {isSignedIn && visibleCities.length === 0 ? (
-        <div className="card-shell px-6 py-7 sm:px-8">
-          <p className="eyebrow">Your feed</p>
-          <h3 className="mt-3 text-2xl font-semibold">Choose cities to start your dashboard.</h3>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
-            You are signed in, but you have not saved any favorites yet. Pick at
-            least 3 cities on the preferences page to fully satisfy the
-            personalization requirement.
+        <div className="border-t border-[var(--border)] py-8">
+          <h3 className="text-xl uppercase tracking-widest font-medium">No locations selected</h3>
+          <p className="mt-4 max-w-2xl font-mono text-xs uppercase tracking-wide text-[var(--ink-soft)]">
+            Please select at least 3 cities in your preferences to initialize your data feed.
           </p>
           <div className="mt-6">
             <Link className="button-primary" href="/my-cities">
-              Choose favorite cities
+              Configure Favorites
             </Link>
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
           {visibleCities.map((city) => {
             const snapshot = snapshots[city.id];
             const condition = snapshot
               ? describeWeatherCode(snapshot.weather_code)
-              : {
-                  label: "Waiting for worker",
-                  accent: "rgba(49, 140, 207, 0.12)",
-                };
+              : { label: "Awaiting Sync" };
 
             return (
-              <article
-                className="card-shell city-card px-5 py-5 sm:px-6 sm:py-6"
-                key={city.id}
-                style={{
-                  background: `linear-gradient(180deg, rgba(255,255,255,0.82), ${condition.accent})`,
-                }}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="eyebrow">{city.region}</p>
-                    <h3 className="mt-2 text-2xl font-semibold">{city.name}</h3>
-                    <p className="mt-2 text-sm text-[var(--ink-soft)]">
-                      Local time: {getCityLocalTime(city.timezone)}
-                    </p>
-                  </div>
-                  <div className="rounded-full border border-white/70 bg-white/75 px-3 py-2 text-sm font-medium">
-                    {condition.label}
+              <article key={city.id} className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
+                <div className="w-full md:w-1/3">
+                  <h3 className="text-xl font-medium uppercase tracking-widest">{city.name}</h3>
+                  <div className="mt-2 text-xs font-mono tracking-wider uppercase text-[var(--ink-soft)]">
+                    {city.region} • {getCityLocalTime(city.timezone)}
                   </div>
                 </div>
 
                 {snapshot ? (
-                  <>
-                    <div className="mt-8 flex items-end justify-between gap-4">
-                      <div>
-                        <p className="text-5xl font-semibold tracking-tight sm:text-6xl">
+                  <div className="flex w-full md:w-2/3 items-end md:items-center justify-between gap-6">
+                    <div className="flex flex-col gap-2">
+                       <span className="font-mono text-xs uppercase tracking-widest font-medium">
+                         {condition.label}
+                       </span>
+                       <span className="font-mono text-[0.65rem] uppercase tracking-wider text-[var(--ink-soft)]">
+                         Drop: {snapshot.precipitation_mm.toFixed(1)}mm • Hum: {snapshot.relative_humidity}% • Wnd: {formatWind(snapshot.wind_speed_kph)}
+                       </span>
+                    </div>
+                    
+                    <div className="text-right">
+                       <div className="text-4xl sm:text-5xl font-mono font-medium tracking-tighter">
                           {formatTemperature(snapshot.temperature_c, preferredUnit)}
-                        </p>
-                        <p className="mt-3 text-sm text-[var(--ink-soft)]">
-                          Feels like{" "}
-                          {formatTemperature(
-                            snapshot.apparent_temperature_c,
-                            preferredUnit,
-                          )}
-                        </p>
-                      </div>
-                      <div className="card-shell-strong px-4 py-4 text-sm leading-7">
-                        <p>
-                          Humidity <strong>{snapshot.relative_humidity}%</strong>
-                        </p>
-                        <p>
-                          Wind <strong>{formatWind(snapshot.wind_speed_kph)}</strong>
-                        </p>
-                        <p>
-                          Precip <strong>{snapshot.precipitation_mm.toFixed(1)} mm</strong>
-                        </p>
-                      </div>
+                       </div>
+                       <div className="mt-1 font-mono text-[0.65rem] uppercase tracking-wider text-[var(--ink-soft)]">
+                          Feels {formatTemperature(snapshot.apparent_temperature_c, preferredUnit)}
+                       </div>
                     </div>
-
-                    <div className="mt-6 flex items-center justify-between gap-4 border-t border-white/60 pt-5 text-sm text-[var(--ink-soft)]">
-                      <span>Updated {formatRelativeTime(snapshot.updated_at)}</span>
-                      <span className="mono">{city.timezone}</span>
-                    </div>
-                  </>
+                  </div>
                 ) : (
-                  <div className="mt-8 rounded-[24px] border border-white/60 bg-white/72 px-5 py-5 text-sm leading-7 text-[var(--ink-soft)]">
-                    The worker has not written a weather row for this city yet.
+                  <div className="w-full md:w-2/3 font-mono text-xs uppercase tracking-widest text-[var(--ink-soft)] text-right">
+                    Sync pending...
                   </div>
                 )}
               </article>
             );
           })}
+        </div>
+      )}
+
+      {isSignedIn ? null : (
+        <div className="flex flex-wrap gap-4 pt-4">
+          <Link className="button-primary" href="/sign-up">
+            Create Account
+          </Link>
+          <Link className="button-secondary" href="/my-cities">
+            View Settings Preview
+          </Link>
         </div>
       )}
     </section>

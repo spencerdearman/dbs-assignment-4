@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --canvas: #fff9f1;
-  --surface: rgba(255, 255, 255, 0.74);
-  --surface-strong: rgba(255, 255, 255, 0.92);
-  --border: rgba(100, 116, 139, 0.16);
-  --ink: #17324d;
-  --ink-soft: #4c647a;
-  --accent: #ff8f5a;
-  --accent-cool: #318ccf;
-  --shadow: 0 24px 60px rgba(23, 50, 77, 0.12);
+  --canvas: #ffffff;
+  --surface: #ffffff;
+  --surface-strong: #fafafa;
+  --border: #eeeeee;
+  --ink: #111111;
+  --ink-soft: #999999;
+  --accent: #000000;
+  --accent-cool: #333333;
+  --shadow: none;
 }
 
 @theme inline {
@@ -22,10 +22,7 @@
 body {
   min-height: 100vh;
   color: var(--ink);
-  background:
-    radial-gradient(circle at top left, rgba(255, 177, 107, 0.35), transparent 30%),
-    radial-gradient(circle at top right, rgba(76, 164, 230, 0.28), transparent 30%),
-    linear-gradient(180deg, #fffaf4 0%, #eef8ff 48%, #fffefb 100%);
+  background: var(--canvas);
   font-family: var(--font-space-grotesk), sans-serif;
 }
 
@@ -35,28 +32,27 @@ a {
 }
 
 ::selection {
-  background: rgba(255, 143, 90, 0.22);
+  background: #eeeeee;
+  color: #111111;
 }
 
 .card-shell {
   border: 1px solid var(--border);
-  background: var(--surface);
-  backdrop-filter: blur(18px);
-  box-shadow: var(--shadow);
-  border-radius: 28px;
+  background: var(--canvas);
+  border-radius: 0px;
 }
 
 .card-shell-strong {
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--border);
   background: var(--surface-strong);
-  box-shadow: var(--shadow);
-  border-radius: 28px;
+  border-radius: 0px;
 }
 
 .eyebrow {
-  font-size: 0.72rem;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 0.7rem;
   line-height: 1.1rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -67,26 +63,20 @@ a {
 
 .nav-link {
   border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 0.7rem 1rem;
+  padding: 0.6rem 1rem;
   color: var(--ink-soft);
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: color 150ms ease, border-color 150ms ease;
 }
 
 .nav-link:hover {
-  border-color: rgba(49, 140, 207, 0.18);
-  background: rgba(255, 255, 255, 0.55);
   color: var(--ink);
-  transform: translateY(-1px);
 }
 
 .nav-link-active {
-  border-color: rgba(255, 143, 90, 0.32);
-  background: rgba(255, 255, 255, 0.8);
+  border-bottom-color: var(--ink);
   color: var(--ink);
 }
 
@@ -94,20 +84,19 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(49, 140, 207, 0.14);
-  background: rgba(255, 255, 255, 0.7);
-  padding: 0.45rem 0.8rem;
-  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--ink-soft);
 }
 
 .pill-dot {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 999px;
-  background: var(--accent-cool);
-  box-shadow: 0 0 0 4px rgba(49, 140, 207, 0.14);
+  width: 0.35rem;
+  height: 0.35rem;
+  background: var(--ink);
 }
 
 .button-primary {
@@ -115,20 +104,20 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent), #ffb067);
-  color: white;
-  padding: 0.9rem 1.2rem;
-  font-weight: 600;
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    opacity 160ms ease;
-  box-shadow: 0 16px 30px rgba(255, 143, 90, 0.24);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--canvas);
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: background 150ms ease, color 150ms ease;
 }
 
 .button-primary:hover {
-  transform: translateY(-1px);
+  background: var(--canvas);
+  color: var(--ink);
 }
 
 .button-secondary {
@@ -136,54 +125,39 @@ a {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(76, 100, 122, 0.2);
-  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--border);
+  background: var(--canvas);
   color: var(--ink);
-  padding: 0.9rem 1.2rem;
-  font-weight: 600;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    background-color 160ms ease,
-    opacity 160ms ease;
+  padding: 0.75rem 1.25rem;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: border-color 150ms ease;
 }
 
 .button-secondary:hover {
-  transform: translateY(-1px);
-  border-color: rgba(49, 140, 207, 0.3);
+  border-color: var(--ink-soft);
 }
 
 .field {
   width: 100%;
-  border-radius: 18px;
-  border: 1px solid rgba(76, 100, 122, 0.18);
-  background: rgba(255, 255, 255, 0.92);
-  padding: 0.95rem 1rem;
-  font-size: 0.98rem;
+  border-radius: 0px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  padding: 0.8rem 1rem;
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-size: 0.9rem;
   color: var(--ink);
   outline: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 150ms ease;
 }
 
 .field:focus {
-  border-color: rgba(49, 140, 207, 0.45);
-  box-shadow: 0 0 0 4px rgba(49, 140, 207, 0.12);
+  border-color: var(--ink);
 }
 
 .city-card {
   position: relative;
   overflow: hidden;
-}
-
-.city-card::after {
-  content: "";
-  position: absolute;
-  inset: auto -10% -65% auto;
-  width: 180px;
-  height: 180px;
-  background: radial-gradient(circle, rgba(255, 176, 103, 0.2), transparent 65%);
-  pointer-events: none;
 }
