@@ -65,7 +65,7 @@ export function WeatherDashboard() {
           citiesResult.error?.message ||
             snapshotsResult.error?.message ||
             workerResult.error?.message ||
-          "Failed to load the weather dashboard.",
+            "Failed to load the weather dashboard.",
           "the dashboard",
         ),
       );
@@ -87,7 +87,7 @@ export function WeatherDashboard() {
           formatSupabaseRequestError(
             favoritesResult.error?.message ||
               profileResult.error?.message ||
-            "Failed to load your saved preferences.",
+              "Failed to load your saved preferences.",
             "your saved preferences",
           ),
         );
@@ -269,7 +269,12 @@ export function WeatherDashboard() {
           <p className="mt-1 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
             {workerStatus?.last_success_at
               ? formatRelativeTime(workerStatus.last_success_at)
-              : "No polls"}
+              : workerStatus?.last_run_at
+                ? `Last run ${formatRelativeTime(workerStatus.last_run_at)}`
+                : "No polls"}
+          </p>
+          <p className="mt-1 text-[0.65rem] text-[var(--ink-soft)]">
+            {workerStatus?.last_error ?? "Railway worker should poll every 15 minutes."}
           </p>
         </div>
       </div>
@@ -341,7 +346,11 @@ export function WeatherDashboard() {
                 className="flex flex-col justify-between gap-5 py-6 transition-colors hover:bg-[var(--surface-strong)] md:flex-row md:items-center"
               >
                 <div className="w-full md:w-1/3">
-                  <h3 className="text-xl font-medium tracking-tight">{city.name}</h3>
+                  <h3 className="text-xl font-medium tracking-tight">
+                    <Link className="transition-colors hover:opacity-60" href={`/cities/${city.id}`}>
+                      {city.name}
+                    </Link>
+                  </h3>
                   <div className="mt-2 text-sm text-[var(--ink-soft)]">
                     {city.region} · {getCityLocalTime(city.timezone)}
                   </div>

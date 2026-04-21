@@ -181,13 +181,13 @@ export function CityPreferences() {
     <section className="space-y-16">
       <div className="grid grid-cols-2 gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-4">
         <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Following</p>
+          <p className="eyebrow mb-2">Saved cities</p>
           <p className="text-4xl font-semibold tracking-tighter">
             {favoriteIds.length}
           </p>
         </div>
         <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Target Min</p>
+          <p className="eyebrow mb-2">Minimum</p>
           <p className="text-4xl font-semibold tracking-tighter">3</p>
         </div>
         <div className="card-shell-strong col-span-2 p-5">
@@ -251,7 +251,11 @@ export function CityPreferences() {
               key={city.id}
             >
               <div className="w-full md:w-2/3">
-                <h4 className="text-xl font-medium tracking-tight">{city.name}</h4>
+                <h4 className="text-xl font-medium tracking-tight">
+                  <Link className="transition-colors hover:opacity-60" href={`/cities/${city.id}`}>
+                    {city.name}
+                  </Link>
+                </h4>
                 <div className="mt-2 text-sm text-[var(--ink-soft)]">
                   {city.region}, {city.country} · {city.latitude.toFixed(4)},{" "}
                   {city.longitude.toFixed(4)}
@@ -269,10 +273,10 @@ export function CityPreferences() {
                   type="button"
                 >
                   {busyCityId === city.id
-                    ? "WAIT..."
+                    ? "Saving..."
                     : isFavorite
-                      ? "FOLLOWING"
-                      : "FOLLOW"}
+                      ? "− Remove"
+                      : "+ Save"}
                 </button>
               </div>
             </article>
