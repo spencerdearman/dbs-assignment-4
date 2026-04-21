@@ -36,7 +36,7 @@ create table if not exists public.weather_snapshots (
 );
 
 create table if not exists public.user_profiles (
-  user_id uuid primary key references auth.users(id) on delete cascade,
+  user_id text primary key default (auth.jwt()->>'sub'),
   preferred_unit text not null default 'fahrenheit' check (preferred_unit in ('fahrenheit', 'celsius')),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
@@ -44,7 +44,7 @@ create table if not exists public.user_profiles (
 
 create table if not exists public.user_city_preferences (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  user_id text not null default (auth.jwt()->>'sub'),
   city_id text not null references public.cities(id) on delete cascade,
   created_at timestamptz not null default timezone('utc', now()),
   unique(user_id, city_id)
@@ -110,43 +110,43 @@ create policy "users can view their profile"
 on public.user_profiles
 for select
 to authenticated
-using (auth.uid() = user_id);
+using ((select auth.jwt()->>'sub') = user_id);
 
 drop policy if exists "users can insert their profile" on public.user_profiles;
 create policy "users can insert their profile"
 on public.user_profiles
 for insert
 to authenticated
-with check (auth.uid() = user_id);
+with check ((select auth.jwt()->>'sub') = user_id);
 
 drop policy if exists "users can update their profile" on public.user_profiles;
 create policy "users can update their profile"
 on public.user_profiles
 for update
 to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+using ((select auth.jwt()->>'sub') = user_id)
+with check ((select auth.jwt()->>'sub') = user_id);
 
 drop policy if exists "users can view their favorite cities" on public.user_city_preferences;
 create policy "users can view their favorite cities"
 on public.user_city_preferences
 for select
 to authenticated
-using (auth.uid() = user_id);
+using ((select auth.jwt()->>'sub') = user_id);
 
 drop policy if exists "users can add their favorite cities" on public.user_city_preferences;
 create policy "users can add their favorite cities"
 on public.user_city_preferences
 for insert
 to authenticated
-with check (auth.uid() = user_id);
+with check ((select auth.jwt()->>'sub') = user_id);
 
 drop policy if exists "users can delete their favorite cities" on public.user_city_preferences;
 create policy "users can delete their favorite cities"
 on public.user_city_preferences
 for delete
 to authenticated
-using (auth.uid() = user_id);
+using ((select auth.jwt()->>'sub') = user_id);
 
 insert into public.worker_status (
   id,
@@ -195,4 +195,3 @@ begin
   end if;
 end
 $$;
-

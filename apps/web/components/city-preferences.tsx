@@ -12,12 +12,12 @@ import { useAuth } from "@/components/auth-provider";
 import type { CityRecord, TemperatureUnit } from "@/lib/types";
 
 export function CityPreferences() {
-  const { hasEnv, isReady, supabase, user } = useAuth();
+  const { hasEnv, isReady, isSignedIn, supabase, userId } = useAuth();
   const [cities, setCities] = useState<CityRecord[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [preferredUnit, setPreferredUnit] =
     useState<TemperatureUnit>("fahrenheit");
-  const [loading, setLoading] = useState(() => Boolean(supabase && user));
+  const [loading, setLoading] = useState(() => Boolean(supabase && userId));
   const [busyCityId, setBusyCityId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function CityPreferences() {
   const deferredSearch = useDeferredValue(search);
 
   const loadPreferences = useEffectEvent(async () => {
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
       return;
     }
 
@@ -58,16 +58,16 @@ export function CityPreferences() {
   });
 
   useEffect(() => {
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
       return;
     }
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPreferences();
-  }, [supabase, user]);
+  }, [supabase, userId]);
 
   async function toggleFavorite(cityId: string) {
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
       return;
     }
 
@@ -94,7 +94,7 @@ export function CityPreferences() {
   }
 
   async function updateUnit(unit: TemperatureUnit) {
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
       return;
     }
 
@@ -103,7 +103,7 @@ export function CityPreferences() {
 
     const { error } = await supabase.from("user_profiles").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         preferred_unit: unit,
       },
       { onConflict: "user_id" },
@@ -123,7 +123,7 @@ export function CityPreferences() {
     );
   }
 
-  if (!user) {
+  if (!isSignedIn) {
     return (
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="card-shell px-6 py-7 sm:px-8">
@@ -133,10 +133,10 @@ export function CityPreferences() {
           </h2>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
             Favorites and unit preferences are stored per user, so this page only
-            becomes interactive after auth.
+            becomes interactive after auth through Clerk.
           </p>
           <div className="mt-6">
-            <Link className="button-primary" href="/auth">
+            <Link className="button-primary" href="/sign-in">
               Go to sign in
             </Link>
           </div>

@@ -1,4 +1,4 @@
-# CityCast Live Architecture
+# Cloud Architecture
 
 ## Goal
 
@@ -12,7 +12,7 @@ External API -> background worker -> Supabase -> Next.js frontend
 
 - Next.js App Router frontend
 - Deployed to Vercel
-- Handles Supabase Auth
+- Handles Clerk authentication
 - Reads weather data from Supabase
 - Subscribes to `weather_snapshots` and `worker_status` through Supabase Realtime
 - Lets each user manage favorite cities and a preferred temperature unit
@@ -28,7 +28,7 @@ External API -> background worker -> Supabase -> Next.js frontend
 
 ### Supabase
 
-- Stores auth users
+- Works with Clerk-issued JWTs for authenticated database access
 - Stores city catalog, user preferences, and latest weather records
 - Enforces RLS for user-owned rows
 - Publishes realtime changes to the frontend
@@ -67,7 +67,7 @@ Latest weather record per city:
 
 Per-user personalization:
 
-- `user_id`
+- `user_id` (Clerk user id)
 - `preferred_unit`
 
 ### `user_city_preferences`
@@ -75,7 +75,7 @@ Per-user personalization:
 Favorite city join table:
 
 - `id`
-- `user_id`
+- `user_id` (Clerk user id)
 - `city_id`
 
 ### `worker_status`
@@ -101,9 +101,10 @@ Single-row operational status for the polling service:
 
 ## Auth and authorization
 
-- Supabase Auth handles sign up, sign in, and sign out
+- Clerk handles sign up, sign in, sign out, and Google sign in
 - Public weather data is readable by everyone
 - `user_profiles` and `user_city_preferences` are only readable and writable by the row owner
+- Supabase RLS reads the Clerk user id from `auth.jwt()->>'sub'`
 - The worker uses the service role key because it is trusted infrastructure, not a browser client
 
 ## Environment variables
@@ -111,8 +112,10 @@ Single-row operational status for the polling service:
 ### Frontend
 
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
 
 ### Worker
 
@@ -126,7 +129,7 @@ Single-row operational status for the polling service:
 
 - Root directory: `apps/web`
 - Add frontend env vars
-- Set Supabase Auth site URL / redirect URL to the deployed frontend domain
+- Set Clerk allowed origins / redirect behavior to the deployed frontend domain as needed
 
 ### Railway
 
@@ -141,4 +144,3 @@ Single-row operational status for the polling service:
 - Wrong site URL causing awkward auth confirmation redirects
 - Missing service role key in Railway
 - Worker running but frontend pointed at the wrong Supabase project
-

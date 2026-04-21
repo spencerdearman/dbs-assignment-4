@@ -2,71 +2,50 @@
 
 import {
   createContext,
-  startTransition,
   useContext,
-  useEffect,
-  useState,
+  useMemo,
   type ReactNode,
 } from "react";
-import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
+import { useClerk, useSession, useUser } from "@clerk/nextjs";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type AuthContextValue = {
   hasEnv: boolean;
   isReady: boolean;
-  session: Session | null;
+  isSignedIn: boolean;
+  signOut: () => Promise<void>;
   supabase: SupabaseClient | null;
-  user: User | null;
+  userEmail: string | null;
+  userId: string | null;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [supabase] = useState(() => createSupabaseBrowserClient());
-  const [session, setSession] = useState<Session | null>(null);
-  const [isReady, setIsReady] = useState(() => !supabase);
+  const { signOut } = useClerk();
+  const { isLoaded: isSessionLoaded, session } = useSession();
+  const { isLoaded: isUserLoaded, user } = useUser();
 
-  useEffect(() => {
-    if (!supabase) {
-      return;
-    }
+  const supabase = useMemo(
+    () =>
+      createSupabaseBrowserClient(async () => (await session?.getToken()) ?? null),
+    [session],
+  );
 
-    let isMounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!isMounted) {
-        return;
-      }
-
-      startTransition(() => {
-        setSession(data.session);
-        setIsReady(true);
-      });
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      startTransition(() => {
-        setSession(nextSession);
-        setIsReady(true);
-      });
-    });
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, [supabase]);
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress ?? user?.emailAddresses[0]?.emailAddress ?? null;
 
   return (
     <AuthContext.Provider
       value={{
         hasEnv: Boolean(supabase),
-        isReady,
-        session,
+        isReady: Boolean(supabase) && isSessionLoaded && isUserLoaded,
+        isSignedIn: Boolean(user),
+        signOut,
         supabase,
-        user: session?.user ?? null,
+        userEmail,
+        userId: user?.id ?? null,
       }}
     >
       {children}

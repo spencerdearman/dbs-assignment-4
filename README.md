@@ -1,4 +1,4 @@
-# CityCast Live
+# Cloud
 
 A weather-focused version of the Week 4 "build a system" assignment:
 
@@ -9,11 +9,12 @@ The repo follows the class monorepo structure:
 - `apps/web` - Next.js + Tailwind frontend
 - `apps/worker` - Node.js polling worker for Open-Meteo
 - `supabase/schema.sql` - tables, RLS policies, and Realtime setup
+- `supabase/clerk-migration.sql` - migration from Supabase Auth-style user ids to Clerk user ids
 - `CLAUDE.md` - architecture blueprint for the whole system
 
 ## What the app does
 
-- Uses Supabase Auth for sign up / sign in
+- Uses Clerk for sign up / sign in, including Google sign in when enabled
 - Lets each user choose favorite cities
 - Stores a preferred temperature unit per user
 - Polls Open-Meteo on a background interval
@@ -23,11 +24,12 @@ The repo follows the class monorepo structure:
 ## Local setup
 
 1. In Supabase, create a new project.
-2. Run the SQL in [supabase/schema.sql](/Users/spencerdearman/dbs-assignment-4/supabase/schema.sql:1).
-3. Add frontend env vars to `apps/web/.env.local` using [apps/web/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/web/.env.example:1).
-4. Add worker env vars to `apps/worker/.env` using [apps/worker/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/worker/.env.example:1).
-5. Start the frontend with `npm run dev:web`.
-6. Start the worker with `npm run dev:worker`.
+2. If you are setting up from scratch, run [supabase/schema.sql](/Users/spencerdearman/dbs-assignment-4/supabase/schema.sql:1).
+3. If you already ran the earlier Supabase Auth version, run [supabase/clerk-migration.sql](/Users/spencerdearman/dbs-assignment-4/supabase/clerk-migration.sql:1).
+4. Add frontend env vars to `apps/web/.env.local` using [apps/web/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/web/.env.example:1).
+5. Add worker env vars to `apps/worker/.env` using [apps/worker/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/worker/.env.example:1).
+6. Start the frontend with `npm run dev:web`.
+7. Start the worker with `npm run dev:worker`.
 
 ## Required keys
 
@@ -36,8 +38,10 @@ Open-Meteo is free and does not require an API key.
 You only need:
 
 - Supabase project URL
-- Supabase anon key or publishable key
+- Supabase publishable key
 - Supabase service role key
+- Clerk publishable key
+- Clerk secret key
 - Your deployed Vercel URL for `NEXT_PUBLIC_SITE_URL`
 
 ## Deployment

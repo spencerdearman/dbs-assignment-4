@@ -23,7 +23,7 @@ function snapshotMapFromRows(rows: WeatherSnapshotRecord[]) {
 }
 
 export function WeatherDashboard() {
-  const { hasEnv, isReady, supabase, user } = useAuth();
+  const { hasEnv, isReady, isSignedIn, supabase, userId } = useAuth();
   const [cities, setCities] = useState<CityRecord[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfileRecord | null>(null);
@@ -71,7 +71,7 @@ export function WeatherDashboard() {
     let nextFavoriteIds: string[] = [];
     let nextProfile: UserProfileRecord | null = null;
 
-    if (user) {
+    if (userId) {
       const [favoritesResult, profileResult] = await Promise.all([
         supabase.from("user_city_preferences").select("city_id"),
         supabase.from("user_profiles").select("*").maybeSingle(),
@@ -108,7 +108,7 @@ export function WeatherDashboard() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadDashboard();
-  }, [supabase, user]);
+  }, [supabase, userId]);
 
   useEffect(() => {
     if (!supabase) {
@@ -116,7 +116,7 @@ export function WeatherDashboard() {
     }
 
     const channel = supabase
-      .channel(`weather-dashboard-${user?.id ?? "guest"}`)
+      .channel(`weather-dashboard-${userId ?? "guest"}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "weather_snapshots" },
@@ -164,18 +164,18 @@ export function WeatherDashboard() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, user]);
+  }, [supabase, userId]);
 
   async function updatePreferredUnit(unit: TemperatureUnit) {
     setLocalUnit(unit);
 
-    if (!supabase || !user) {
+    if (!supabase || !userId) {
       return;
     }
 
     const { error: updateError } = await supabase.from("user_profiles").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         preferred_unit: unit,
       },
       { onConflict: "user_id" },
@@ -184,7 +184,7 @@ export function WeatherDashboard() {
     if (!updateError) {
       startTransition(() => {
         setProfile((current) => ({
-          user_id: user.id,
+          user_id: userId,
           preferred_unit: unit,
           created_at: current?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -219,7 +219,7 @@ export function WeatherDashboard() {
   const sortedCities = [...cities].sort((left, right) =>
     left.name.localeCompare(right.name),
   );
-  const visibleCities = user
+  const visibleCities = isSignedIn
     ? sortedCities.filter((city) => favoriteIds.includes(city.id))
     : sortedCities.filter((city) => city.is_featured);
   const hottestCity = visibleCities
@@ -236,7 +236,7 @@ export function WeatherDashboard() {
         <div className="card-shell px-6 py-7 sm:px-8">
           <p className="eyebrow">Realtime feed</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-            {user ? "Your cities, updating live." : "Featured city weather, streaming live."}
+            {isSignedIn ? "Your cities, updating live." : "Featured city weather, streaming live."}
           </h2>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
             The worker polls Open-Meteo, writes to Supabase, and this page listens
@@ -260,9 +260,9 @@ export function WeatherDashboard() {
             </div>
           </div>
 
-          {user ? null : (
+          {isSignedIn ? null : (
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link className="button-primary" href="/auth">
+              <Link className="button-primary" href="/sign-up">
                 Sign up for personalization
               </Link>
               <Link className="button-secondary" href="/my-cities">
@@ -315,9 +315,9 @@ export function WeatherDashboard() {
                 ))}
               </div>
               <p className="mt-3 text-sm leading-7 text-[var(--ink-soft)]">
-                {user
+                {isSignedIn
                   ? "Saved to your user profile."
-                  : "Guests can toggle locally. Sign in to save it."}
+                  : "Guests can toggle locally. Sign in with Clerk to save it."}
               </p>
             </div>
           </div>
@@ -330,7 +330,7 @@ export function WeatherDashboard() {
         </div>
       ) : null}
 
-      {user && visibleCities.length === 0 ? (
+      {isSignedIn && visibleCities.length === 0 ? (
         <div className="card-shell px-6 py-7 sm:px-8">
           <p className="eyebrow">Your feed</p>
           <h3 className="mt-3 text-2xl font-semibold">Choose cities to start your dashboard.</h3>
