@@ -17,8 +17,8 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <div className="card-shell bg-[var(--surface-strong)] p-4 sm:p-6">
-          <div className="rounded-[28px] border border-[var(--border)] bg-white px-5 py-6 shadow-[0_24px_60px_rgba(17,17,17,0.06)] sm:px-8 sm:py-8">
+        <div className="mx-auto w-full max-w-[560px] rounded-[28px] border border-[var(--border)] bg-[var(--surface-strong)] p-4 shadow-[0_24px_60px_rgba(17,17,17,0.06)] sm:p-6">
+          <div className="rounded-[24px] border border-[var(--border)] bg-white px-5 py-6 sm:px-8 sm:py-8">
             <SignIn
               appearance={clerkAppearance}
               fallbackRedirectUrl="/my-cities"

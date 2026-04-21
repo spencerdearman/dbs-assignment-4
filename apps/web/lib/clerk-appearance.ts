@@ -1,4 +1,11 @@
 export const clerkAppearance = {
+  layout: {
+    logoPlacement: "outside",
+    showOptionalFields: false,
+    socialButtonsPlacement: "top",
+    socialButtonsVariant: "blockButton",
+    unsafe_disableDevelopmentModeWarnings: true,
+  },
   variables: {
     borderRadius: "14px",
     colorBackground: "#ffffff",
