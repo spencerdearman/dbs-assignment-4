@@ -9,7 +9,8 @@ import { useAuth } from "@/components/auth-provider";
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { hasEnv, isReady, isSignedIn, signOut, userEmail } = useAuth();
+  const { hasEnv, isReady, isSignedIn, missingEnv, signOut, userEmail } =
+    useAuth();
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -27,20 +28,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto flex min-h-screen w-full flex-col bg-[var(--canvas)]">
-      {/* Top Black Nav Bar */}
-      <header className="flex w-full flex-col sm:flex-row sm:items-center justify-between bg-[var(--ink)] px-6 py-4 text-[var(--canvas)]">
-        <div className="flex items-center gap-8">
-          <div className="font-mono text-sm font-bold tracking-widest uppercase">
-            Cloud
-          </div>
-          <nav className="flex gap-6">
+      <header className="border-b border-black bg-[var(--ink)] text-white">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-8">
+            <div className="text-sm font-semibold tracking-tight">Cloud</div>
+            <nav className="flex flex-wrap gap-2">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
-                  className={`font-mono text-xs tracking-wider uppercase transition-colors ${
-                    isActive ? "text-white font-medium" : "text-[#888888] hover:text-white"
-                  }`}
+                  className={`nav-link ${isActive ? "nav-link-active" : ""}`}
                   href={item.href}
                   key={item.href}
                 >
@@ -48,42 +45,44 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
-          </nav>
-        </div>
+            </nav>
+          </div>
 
-        <div className="mt-4 flex items-center gap-4 text-xs font-mono tracking-wider uppercase text-[#888888] sm:mt-0">
-          {!hasEnv
-            ? "Setup Required"
-            : !isReady
-              ? "Connecting..."
-              : isSignedIn
-                ? userEmail
-                : "Guest"}
-          
-          {isReady && hasEnv && (
-            <div className="flex items-center gap-3">
-              {isSignedIn ? (
-                <>
-                  <UserButton />
-                  <button
-                    className="hover:text-white transition-colors"
-                    disabled={signingOut}
-                    onClick={handleSignOut}
-                    type="button"
-                  >
-                    {signingOut ? "..." : "Out"}
-                  </button>
-                </>
-              ) : null}
-            </div>
-          )}
+          <div className="flex items-center gap-3 text-xs text-white/70">
+            <span>
+              {!hasEnv
+                ? "Setup required"
+                : !isReady
+                  ? "Connecting"
+                  : isSignedIn
+                    ? userEmail
+                    : "Guest"}
+            </span>
+
+            {isReady && hasEnv && isSignedIn ? (
+              <div className="flex items-center gap-3">
+                <UserButton />
+                <button
+                  className="text-white/70 transition-colors hover:text-white"
+                  disabled={signingOut}
+                  onClick={handleSignOut}
+                  type="button"
+                >
+                  {signingOut ? "Signing out" : "Sign out"}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8">
         {!hasEnv ? (
-          <div className="mb-8 border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-4 font-mono text-sm uppercase tracking-wide text-[var(--ink)] sm:px-6">
-            Missing Env Vars: Add Supabase & Clerk keys to .env.local
+          <div className="mb-8 card-shell-strong px-5 py-4 text-sm text-[var(--ink)] sm:px-6">
+            <span className="eyebrow block">Environment</span>
+            <p className="mt-2 text-sm text-[var(--ink)]">
+              Missing env vars: {missingEnv.join(", ")}
+            </p>
           </div>
         ) : null}
 

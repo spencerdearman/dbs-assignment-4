@@ -23,7 +23,8 @@ function snapshotMapFromRows(rows: WeatherSnapshotRecord[]) {
 }
 
 export function WeatherDashboard() {
-  const { hasEnv, isReady, isSignedIn, supabase, userId } = useAuth();
+  const { hasEnv, isReady, isSignedIn, missingEnv, supabase, userId } =
+    useAuth();
   const [cities, setCities] = useState<CityRecord[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [profile, setProfile] = useState<UserProfileRecord | null>(null);
@@ -196,10 +197,15 @@ export function WeatherDashboard() {
   if (!hasEnv) {
     return (
       <section className="py-8">
-        <p className="eyebrow">Dashboard Exception</p>
-        <h2 className="mt-4 text-3xl font-medium tracking-tight">Setup Required</h2>
+        <p className="eyebrow">Dashboard</p>
+        <h2 className="mt-4 text-3xl font-medium tracking-tight">
+          Setup required
+        </h2>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-soft)]">
           Please provide keys to continue rendering data.
+        </p>
+        <p className="mt-4 mono text-xs tracking-widest text-[var(--ink)]">
+          Missing: {missingEnv.join(", ")}
         </p>
       </section>
     );
@@ -209,7 +215,9 @@ export function WeatherDashboard() {
     return (
       <section className="py-8">
         <p className="eyebrow">System</p>
-        <h2 className="mt-4 text-3xl font-medium tracking-tight">Initializing...</h2>
+        <h2 className="mt-4 text-3xl font-medium tracking-tight">
+          Initializing...
+        </h2>
       </section>
     );
   }
@@ -231,28 +239,27 @@ export function WeatherDashboard() {
 
   return (
     <section className="space-y-16">
-      {/* Top Overview Bar */}
-      <div className="grid grid-cols-2 gap-8 border-b border-t border-[var(--border)] py-8 md:grid-cols-4">
-        <div>
+      <div className="grid grid-cols-2 gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-4">
+        <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Visible Cities</p>
           <p className="text-4xl font-semibold tracking-tighter">{visibleCities.length}</p>
         </div>
-        <div>
+        <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Live Rows</p>
           <p className="text-4xl font-semibold tracking-tighter">{activeCitiesCount}</p>
         </div>
-        <div>
+        <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Warmest City</p>
           <p className="text-4xl font-semibold tracking-tighter">
             {hottestCity ? hottestCity.name : "N/A"}
           </p>
         </div>
-        <div>
+        <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Worker Status</p>
-          <p className="text-xl font-medium uppercase tracking-tight">
+          <p className="text-xl font-medium tracking-tight">
             {workerStatus?.last_success_at ? "Healthy" : "Waiting"}
           </p>
-          <p className="mt-1 font-mono text-[0.65rem] uppercase tracking-wider text-[var(--ink-soft)]">
+          <p className="mt-1 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
             {workerStatus?.last_success_at
               ? formatRelativeTime(workerStatus.last_success_at)
               : "No polls"}
@@ -260,26 +267,34 @@ export function WeatherDashboard() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
+      <div className="flex flex-col justify-between gap-6 pb-2 md:flex-row md:items-end">
         <div>
           <p className="eyebrow mb-2">Realtime Data</p>
-          <h2 className="text-2xl uppercase tracking-widest font-medium">
+          <h2 className="text-2xl font-medium tracking-tight">
             {isSignedIn ? "Your Subscribed Locations" : "Featured Network Feed"}
           </h2>
         </div>
-        
-        <div className="flex items-center gap-4 border-b border-[var(--border)] pb-2">
+
+        <div className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
           <p className="eyebrow">Unit</p>
-          <div className="flex gap-4 font-mono text-xs uppercase tracking-widest">
+          <div className="flex gap-2 text-sm">
             <button
               onClick={() => void updatePreferredUnit("fahrenheit")}
-              className={`transition-colors ${preferredUnit === "fahrenheit" ? "text-[var(--ink)] font-bold" : "text-[var(--ink-soft)] hover:text-[var(--ink)]"}`}
+              className={`rounded-full border px-3 py-1.5 transition-colors ${
+                preferredUnit === "fahrenheit"
+                  ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
+              }`}
             >
               °F
             </button>
             <button
               onClick={() => void updatePreferredUnit("celsius")}
-              className={`transition-colors ${preferredUnit === "celsius" ? "text-[var(--ink)] font-bold" : "text-[var(--ink-soft)] hover:text-[var(--ink)]"}`}
+              className={`rounded-full border px-3 py-1.5 transition-colors ${
+                preferredUnit === "celsius"
+                  ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
+              }`}
             >
               °C
             </button>
@@ -288,7 +303,7 @@ export function WeatherDashboard() {
       </div>
 
       {error ? (
-        <div className="border border-[var(--ink)] bg-[var(--surface-strong)] px-6 py-4 font-mono text-sm uppercase tracking-wide">
+        <div className="card-shell-strong px-6 py-4 text-sm text-[var(--ink)]">
           {error}
         </div>
       ) : null}
@@ -311,39 +326,48 @@ export function WeatherDashboard() {
             const snapshot = snapshots[city.id];
             const condition = snapshot
               ? describeWeatherCode(snapshot.weather_code)
-              : { label: "Awaiting Sync" };
+              : { label: "Awaiting Sync", accent: "rgba(17, 17, 17, 0.22)" };
 
             return (
-              <article key={city.id} className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
+              <article
+                key={city.id}
+                className="flex flex-col justify-between gap-5 py-6 transition-colors hover:bg-[var(--surface-strong)] md:flex-row md:items-center"
+              >
                 <div className="w-full md:w-1/3">
-                  <h3 className="text-xl font-medium uppercase tracking-widest">{city.name}</h3>
-                  <div className="mt-2 text-xs font-mono tracking-wider uppercase text-[var(--ink-soft)]">
-                    {city.region} • {getCityLocalTime(city.timezone)}
+                  <h3 className="text-xl font-medium tracking-tight">{city.name}</h3>
+                  <div className="mt-2 text-sm text-[var(--ink-soft)]">
+                    {city.region} · {getCityLocalTime(city.timezone)}
                   </div>
                 </div>
 
                 {snapshot ? (
-                  <div className="flex w-full md:w-2/3 items-end md:items-center justify-between gap-6">
+                  <div className="flex w-full items-end justify-between gap-6 md:w-2/3 md:items-center">
                     <div className="flex flex-col gap-2">
-                       <span className="font-mono text-xs uppercase tracking-widest font-medium">
-                         {condition.label}
-                       </span>
-                       <span className="font-mono text-[0.65rem] uppercase tracking-wider text-[var(--ink-soft)]">
-                         Drop: {snapshot.precipitation_mm.toFixed(1)}mm • Hum: {snapshot.relative_humidity}% • Wnd: {formatWind(snapshot.wind_speed_kph)}
-                       </span>
+                      <span className="flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
+                        <span
+                          className="pill-dot"
+                          style={{ backgroundColor: condition.accent }}
+                        />
+                        {condition.label}
+                      </span>
+                      <span className="mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+                        Rain {snapshot.precipitation_mm.toFixed(1)}mm · Hum{" "}
+                        {snapshot.relative_humidity}% · Wind{" "}
+                        {formatWind(snapshot.wind_speed_kph)}
+                      </span>
                     </div>
-                    
+
                     <div className="text-right">
-                       <div className="text-4xl sm:text-5xl font-mono font-medium tracking-tighter">
-                          {formatTemperature(snapshot.temperature_c, preferredUnit)}
-                       </div>
-                       <div className="mt-1 font-mono text-[0.65rem] uppercase tracking-wider text-[var(--ink-soft)]">
-                          Feels {formatTemperature(snapshot.apparent_temperature_c, preferredUnit)}
-                       </div>
+                      <div className="text-4xl font-medium tracking-tight sm:text-5xl">
+                        {formatTemperature(snapshot.temperature_c, preferredUnit)}
+                      </div>
+                      <div className="mt-1 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+                        Feels {formatTemperature(snapshot.apparent_temperature_c, preferredUnit)}
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full md:w-2/3 font-mono text-xs uppercase tracking-widest text-[var(--ink-soft)] text-right">
+                  <div className="w-full text-right mono text-xs tracking-widest text-[var(--ink-soft)] md:w-2/3">
                     Sync pending...
                   </div>
                 )}

@@ -8,7 +8,10 @@ import {
 } from "react";
 import { useClerk, useSession, useUser } from "@clerk/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
+import {
+  createSupabaseBrowserClient,
+  getMissingSupabaseEnv,
+} from "@/lib/supabase-browser";
 
 type AuthContextValue = {
   hasEnv: boolean;
@@ -16,6 +19,7 @@ type AuthContextValue = {
   isSignedIn: boolean;
   signOut: () => Promise<void>;
   supabase: SupabaseClient | null;
+  missingEnv: string[];
   userEmail: string | null;
   userId: string | null;
 };
@@ -26,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
   const { isLoaded: isSessionLoaded, session } = useSession();
   const { isLoaded: isUserLoaded, user } = useUser();
+  const missingEnv = getMissingSupabaseEnv();
 
   const supabase = useMemo(
     () =>
@@ -39,11 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        hasEnv: Boolean(supabase),
+        hasEnv: missingEnv.length === 0,
         isReady: Boolean(supabase) && isSessionLoaded && isUserLoaded,
         isSignedIn: Boolean(user),
         signOut,
         supabase,
+        missingEnv,
         userEmail,
         userId: user?.id ?? null,
       }}
