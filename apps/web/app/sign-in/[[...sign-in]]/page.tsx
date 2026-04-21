@@ -1,5 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
 import { SiteShell } from "@/components/site-shell";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 
 export default function SignInPage() {
   return (
@@ -9,6 +10,7 @@ export default function SignInPage() {
           <p className="eyebrow">Sign in</p>
           <div className="mt-4">
             <SignIn
+              appearance={clerkAppearance}
               fallbackRedirectUrl="/my-cities"
               forceRedirectUrl="/my-cities"
               path="/sign-in"
@@ -21,4 +23,3 @@ export default function SignInPage() {
     </SiteShell>
   );
 }
-

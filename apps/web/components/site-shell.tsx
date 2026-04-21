@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -61,7 +62,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
             {isReady && hasEnv && isSignedIn ? (
               <div className="flex items-center gap-3">
-                <UserButton />
+                <UserButton appearance={clerkAppearance} />
                 <button
                   className="text-white/70 transition-colors hover:text-white"
                   disabled={signingOut}

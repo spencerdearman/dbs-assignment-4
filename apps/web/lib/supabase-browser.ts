@@ -17,6 +17,17 @@ export function getMissingSupabaseEnv() {
   return missing;
 }
 
+export function formatSupabaseRequestError(
+  message: string,
+  scope: string,
+) {
+  if (message.toLowerCase().includes("failed to fetch")) {
+    return `Cloud could not reach Supabase while loading ${scope}. Check NEXT_PUBLIC_SUPABASE_URL, then redeploy or restart the app after updating env vars.`;
+  }
+
+  return message;
+}
+
 export function createSupabaseBrowserClient(
   accessToken?: () => Promise<string | null>,
 ) {

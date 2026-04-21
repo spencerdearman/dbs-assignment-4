@@ -17,6 +17,7 @@ import {
   formatWind,
   getCityLocalTime,
 } from "@/lib/weather";
+import { formatSupabaseRequestError } from "@/lib/supabase-browser";
 
 function snapshotMapFromRows(rows: WeatherSnapshotRecord[]) {
   return Object.fromEntries(rows.map((row) => [row.city_id, row]));
@@ -60,10 +61,13 @@ export function WeatherDashboard() {
 
     if (citiesResult.error || snapshotsResult.error || workerResult.error) {
       setError(
-        citiesResult.error?.message ||
-          snapshotsResult.error?.message ||
-          workerResult.error?.message ||
+        formatSupabaseRequestError(
+          citiesResult.error?.message ||
+            snapshotsResult.error?.message ||
+            workerResult.error?.message ||
           "Failed to load the weather dashboard.",
+          "the dashboard",
+        ),
       );
       setLoading(false);
       return;
@@ -80,9 +84,12 @@ export function WeatherDashboard() {
 
       if (favoritesResult.error || profileResult.error) {
         setError(
-          favoritesResult.error?.message ||
-            profileResult.error?.message ||
+          formatSupabaseRequestError(
+            favoritesResult.error?.message ||
+              profileResult.error?.message ||
             "Failed to load your saved preferences.",
+            "your saved preferences",
+          ),
         );
         setLoading(false);
         return;

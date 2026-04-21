@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useAuth } from "@/components/auth-provider";
 import type { CityRecord, TemperatureUnit } from "@/lib/types";
+import { formatSupabaseRequestError } from "@/lib/supabase-browser";
 
 export function CityPreferences() {
   const { hasEnv, isReady, isSignedIn, missingEnv, supabase, userId } =
@@ -41,10 +42,13 @@ export function CityPreferences() {
 
     if (citiesResult.error || favoritesResult.error || profileResult.error) {
       setFeedback(
-        citiesResult.error?.message ||
-          favoritesResult.error?.message ||
-          profileResult.error?.message ||
+        formatSupabaseRequestError(
+          citiesResult.error?.message ||
+            favoritesResult.error?.message ||
+            profileResult.error?.message ||
           "Failed to load your city preferences.",
+          "your city preferences",
+        ),
       );
       setLoading(false);
       return;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import "./globals.css";
 
 const displayFont = Space_Grotesk({
@@ -32,7 +33,7 @@ export default function RootLayout({
       className={`${displayFont.variable} ${monoFont.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <ClerkProvider>
+        <ClerkProvider appearance={clerkAppearance}>
           <AuthProvider>{children}</AuthProvider>
         </ClerkProvider>
       </body>
