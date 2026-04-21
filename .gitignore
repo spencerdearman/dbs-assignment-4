@@ -1,0 +1,14 @@
+.DS_Store
+node_modules
+apps/*/node_modules
+apps/web/.next
+apps/web/out
+coverage
+.env
+.env.*
+apps/*/.env
+apps/*/.env.*
+!.env.example
+!apps/*/.env.example
+.vercel
+*.tsbuildinfo
