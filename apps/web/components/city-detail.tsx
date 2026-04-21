@@ -27,6 +27,8 @@ type OpenMeteoDaily = {
   temperature_2m_min: number[];
   weather_code: number[];
   precipitation_probability_max?: number[];
+  precipitation_sum?: number[];
+  precipitation_hours?: number[];
   sunrise?: string[];
   sunset?: string[];
   uv_index_max?: number[];
@@ -39,6 +41,8 @@ type OpenMeteoCurrent = {
   relative_humidity_2m: number;
   precipitation: number | null;
   wind_speed_10m: number;
+  wind_direction_10m?: number;
+  wind_gusts_10m?: number;
   weather_code: number;
   is_day: number | boolean;
   cloud_cover?: number;
@@ -93,6 +97,41 @@ function formatVisibility(valueMeters?: number | null) {
   }
 
   return `${(valueMeters / 1000).toFixed(1)} km`;
+}
+
+function formatCompassDirection(degrees?: number | null) {
+  if (degrees == null) {
+    return "--";
+  }
+
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const normalized = ((degrees % 360) + 360) % 360;
+  const index = Math.round(normalized / 45) % directions.length;
+  return `${directions[index]} ${Math.round(normalized)}°`;
+}
+
+function buildRadarEmbedUrl(city: CityRecord) {
+  const url = new URL("https://embed.windy.com/embed2.html");
+  url.searchParams.set("lat", city.latitude.toFixed(4));
+  url.searchParams.set("lon", city.longitude.toFixed(4));
+  url.searchParams.set("detailLat", city.latitude.toFixed(4));
+  url.searchParams.set("detailLon", city.longitude.toFixed(4));
+  url.searchParams.set("zoom", "7");
+  url.searchParams.set("level", "surface");
+  url.searchParams.set("overlay", "radar");
+  url.searchParams.set("product", "radar");
+  url.searchParams.set("menu", "");
+  url.searchParams.set("message", "");
+  url.searchParams.set("marker", "true");
+  url.searchParams.set("calendar", "now");
+  url.searchParams.set("pressure", "");
+  url.searchParams.set("type", "map");
+  url.searchParams.set("location", "coordinates");
+  url.searchParams.set("detail", "");
+  url.searchParams.set("metricWind", "default");
+  url.searchParams.set("metricTemp", "default");
+  url.searchParams.set("radarRange", "-1");
+  return url.toString();
 }
 
 export function CityDetail({ cityId }: { cityId: string }) {
@@ -194,6 +233,8 @@ export function CityDetail({ cityId }: { cityId: string }) {
         "relative_humidity_2m",
         "precipitation",
         "wind_speed_10m",
+        "wind_direction_10m",
+        "wind_gusts_10m",
         "weather_code",
         "is_day",
         "cloud_cover",
@@ -219,6 +260,8 @@ export function CityDetail({ cityId }: { cityId: string }) {
         "temperature_2m_min",
         "weather_code",
         "precipitation_probability_max",
+        "precipitation_sum",
+        "precipitation_hours",
         "sunrise",
         "sunset",
         "uv_index_max",
@@ -328,6 +371,8 @@ export function CityDetail({ cityId }: { cityId: string }) {
     snapshot?.relative_humidity ?? forecast?.current?.relative_humidity_2m ?? null;
   const currentWind =
     snapshot?.wind_speed_kph ?? forecast?.current?.wind_speed_10m ?? null;
+  const currentWindDirection = forecast?.current?.wind_direction_10m ?? null;
+  const currentWindGust = forecast?.current?.wind_gusts_10m ?? null;
   const currentPrecipitation =
     snapshot?.precipitation_mm ?? forecast?.current?.precipitation ?? 0;
   const currentCloudCover = forecast?.current?.cloud_cover ?? null;
@@ -549,6 +594,37 @@ export function CityDetail({ cityId }: { cityId: string }) {
       </section>
 
       <section className="space-y-4">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="eyebrow">Radar</p>
+            <h3 className="mt-3 text-2xl font-medium tracking-tight">
+              Live precipitation map
+            </h3>
+          </div>
+          <a
+            className="button-secondary"
+            href={`https://www.windy.com/${city.latitude.toFixed(4)}/${city.longitude.toFixed(4)}?radar,${city.latitude.toFixed(4)},${city.longitude.toFixed(4)},7`}
+            rel="noreferrer"
+            target="_blank"
+          >
+            Open full map
+          </a>
+        </div>
+
+        <div className="card-shell overflow-hidden">
+          <iframe
+            className="h-[420px] w-full"
+            loading="lazy"
+            src={buildRadarEmbedUrl(city)}
+            title={`${city.name} precipitation radar`}
+          />
+        </div>
+        <p className="text-sm text-[var(--ink-soft)]">
+          Live radar and precipitation context around {city.name}, embedded for a faster read than opening a separate weather map.
+        </p>
+      </section>
+
+      <section className="space-y-4">
         <div>
           <p className="eyebrow">Metrics</p>
           <h3 className="mt-3 text-2xl font-medium tracking-tight">
@@ -565,6 +641,14 @@ export function CityDetail({ cityId }: { cityId: string }) {
             {
               label: "Wind",
               value: currentWind != null ? formatWind(currentWind) : "--",
+            },
+            {
+              label: "Wind Direction",
+              value: formatCompassDirection(currentWindDirection),
+            },
+            {
+              label: "Wind Gusts",
+              value: currentWindGust != null ? formatWind(currentWindGust) : "--",
             },
             {
               label: "Visibility",
@@ -585,6 +669,13 @@ export function CityDetail({ cityId }: { cityId: string }) {
             {
               label: "Precipitation",
               value: `${Number(currentPrecipitation).toFixed(1)} mm`,
+            },
+            {
+              label: "Rain Hours",
+              value:
+                daily?.precipitation_hours?.[0] != null
+                  ? `${daily.precipitation_hours[0]} h`
+                  : "--",
             },
             {
               label: "Coordinates",
@@ -638,6 +729,9 @@ export function CityDetail({ cityId }: { cityId: string }) {
                   <p className="text-xs text-[var(--ink-soft)]">
                     Chance of rain:{" "}
                     {daily.precipitation_probability_max?.[index] ?? 0}%
+                  </p>
+                  <p className="text-xs text-[var(--ink-soft)]">
+                    Total rain: {daily.precipitation_sum?.[index] ?? 0} mm
                   </p>
                 </article>
               );

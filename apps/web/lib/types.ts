@@ -32,6 +32,14 @@ export type UserProfileRecord = {
   updated_at: string;
 };
 
+export type UserCityPreferenceRecord = {
+  id?: string;
+  user_id: string;
+  city_id: string;
+  sort_order: number;
+  created_at?: string;
+};
+
 export type WorkerStatusRecord = {
   id: string;
   source_name: string;
@@ -41,4 +49,3 @@ export type WorkerStatusRecord = {
   last_error: string | null;
   updated_at: string;
 };
-

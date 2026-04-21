@@ -9,7 +9,11 @@ import {
   useState,
 } from "react";
 import { useAuth } from "@/components/auth-provider";
-import type { CityRecord, TemperatureUnit } from "@/lib/types";
+import type {
+  CityRecord,
+  TemperatureUnit,
+  UserCityPreferenceRecord,
+} from "@/lib/types";
 import { formatSupabaseRequestError } from "@/lib/supabase-browser";
 
 export function CityPreferences() {
@@ -21,6 +25,10 @@ export function CityPreferences() {
     useState<TemperatureUnit>("fahrenheit");
   const [loading, setLoading] = useState(() => Boolean(supabase && userId));
   const [busyCityId, setBusyCityId] = useState<string | null>(null);
+  const [draggedCityId, setDraggedCityId] = useState<string | null>(null);
+  const [dropTargetCityId, setDropTargetCityId] = useState<string | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -36,7 +44,11 @@ export function CityPreferences() {
 
     const [citiesResult, favoritesResult, profileResult] = await Promise.all([
       supabase.from("cities").select("*").order("name"),
-      supabase.from("user_city_preferences").select("city_id"),
+      supabase
+        .from("user_city_preferences")
+        .select("city_id, sort_order, created_at")
+        .order("sort_order")
+        .order("created_at"),
       supabase.from("user_profiles").select("preferred_unit").maybeSingle(),
     ]);
 
@@ -56,11 +68,40 @@ export function CityPreferences() {
 
     startTransition(() => {
       setCities(citiesResult.data ?? []);
-      setFavoriteIds((favoritesResult.data ?? []).map((row) => row.city_id));
+      setFavoriteIds(
+        (favoritesResult.data ?? []).map((row) => row.city_id),
+      );
       setPreferredUnit(profileResult.data?.preferred_unit ?? "fahrenheit");
       setLoading(false);
     });
   });
+
+  async function persistFavoriteOrder(orderedCityIds: string[]) {
+    if (!supabase || !userId || orderedCityIds.length === 0) {
+      return;
+    }
+
+    setReordering(true);
+
+    const payload: UserCityPreferenceRecord[] = orderedCityIds.map(
+      (cityId, index) => ({
+        user_id: userId,
+        city_id: cityId,
+        sort_order: index,
+      }),
+    );
+
+    const { error } = await supabase.from("user_city_preferences").upsert(payload, {
+      onConflict: "user_id,city_id",
+    });
+
+    setReordering(false);
+
+    if (error) {
+      setFeedback(error.message);
+      setReloadKey((current) => current + 1);
+    }
+  }
 
   useEffect(() => {
     if (!supabase || !userId) {
@@ -69,7 +110,7 @@ export function CityPreferences() {
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPreferences();
-  }, [supabase, userId]);
+  }, [supabase, userId, reloadKey]);
 
   async function toggleFavorite(cityId: string) {
     if (!supabase || !userId) {
@@ -80,9 +121,15 @@ export function CityPreferences() {
     setFeedback(null);
 
     const isFavorite = favoriteIds.includes(cityId);
+    const nextFavoriteIds = isFavorite
+      ? favoriteIds.filter((id) => id !== cityId)
+      : [...favoriteIds, cityId];
     const result = isFavorite
       ? await supabase.from("user_city_preferences").delete().eq("city_id", cityId)
-      : await supabase.from("user_city_preferences").insert({ city_id: cityId });
+      : await supabase.from("user_city_preferences").insert({
+          city_id: cityId,
+          sort_order: favoriteIds.length,
+        });
 
     setBusyCityId(null);
 
@@ -92,10 +139,12 @@ export function CityPreferences() {
     }
 
     startTransition(() => {
-      setFavoriteIds((current) =>
-        isFavorite ? current.filter((id) => id !== cityId) : [...current, cityId],
-      );
+      setFavoriteIds(nextFavoriteIds);
     });
+
+    if (isFavorite && nextFavoriteIds.length > 0) {
+      await persistFavoriteOrder(nextFavoriteIds);
+    }
   }
 
   async function updateUnit(unit: TemperatureUnit) {
@@ -176,20 +225,110 @@ export function CityPreferences() {
     const haystack = `${city.name} ${city.region} ${city.country}`.toLowerCase();
     return haystack.includes(normalizedSearch);
   });
-  const savedCities = filteredCities.filter((city) => favoriteIds.includes(city.id));
+  const cityMap = new Map(cities.map((city) => [city.id, city]));
+  const savedCities = favoriteIds
+    .map((cityId) => cityMap.get(cityId))
+    .filter((city): city is CityRecord => Boolean(city));
   const availableCities = filteredCities.filter(
     (city) => !favoriteIds.includes(city.id),
   );
 
-  function renderCityRow(city: CityRecord, isFavorite: boolean) {
+  function reorderFavoriteIds(sourceId: string, targetId: string) {
+    if (sourceId === targetId) {
+      return favoriteIds;
+    }
+
+    const nextFavoriteIds = [...favoriteIds];
+    const sourceIndex = nextFavoriteIds.indexOf(sourceId);
+    const targetIndex = nextFavoriteIds.indexOf(targetId);
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+      return favoriteIds;
+    }
+
+    const [movedId] = nextFavoriteIds.splice(sourceIndex, 1);
+    nextFavoriteIds.splice(targetIndex, 0, movedId);
+    return nextFavoriteIds;
+  }
+
+  async function moveFavoriteCity(targetCityId: string) {
+    if (!draggedCityId || draggedCityId === targetCityId) {
+      setDraggedCityId(null);
+      setDropTargetCityId(null);
+      return;
+    }
+
+    const nextFavoriteIds = reorderFavoriteIds(draggedCityId, targetCityId);
+
+    startTransition(() => {
+      setFavoriteIds(nextFavoriteIds);
+      setDraggedCityId(null);
+      setDropTargetCityId(null);
+    });
+
+    await persistFavoriteOrder(nextFavoriteIds);
+  }
+
+  function renderCityRow(
+    city: CityRecord,
+    isFavorite: boolean,
+    orderIndex?: number,
+  ) {
+    const isDragging = draggedCityId === city.id;
+    const isDropTarget = dropTargetCityId === city.id;
+
     return (
       <article
-        className="flex flex-col justify-between gap-4 py-6 transition-colors md:flex-row md:items-center hover:bg-[var(--surface-strong)]"
+        className={`flex flex-col justify-between gap-4 py-6 transition-colors md:flex-row md:items-center ${
+          isFavorite ? "px-4" : ""
+        } ${isDropTarget ? "bg-[var(--surface-strong)]" : "hover:bg-[var(--surface-strong)]"} ${
+          isDragging ? "opacity-50" : ""
+        }`}
+        draggable={isFavorite && !reordering}
         key={city.id}
+        onDragEnd={() => {
+          setDraggedCityId(null);
+          setDropTargetCityId(null);
+        }}
+        onDragOver={(event) => {
+          if (!isFavorite || !draggedCityId) {
+            return;
+          }
+
+          event.preventDefault();
+          setDropTargetCityId(city.id);
+        }}
+        onDragStart={() => {
+          if (!isFavorite) {
+            return;
+          }
+
+          setDraggedCityId(city.id);
+          setDropTargetCityId(city.id);
+        }}
+        onDrop={(event) => {
+          if (!isFavorite) {
+            return;
+          }
+
+          event.preventDefault();
+          void moveFavoriteCity(city.id);
+        }}
       >
         <div className="w-full md:w-2/3">
+          {isFavorite ? (
+            <div className="mb-3 flex items-center gap-3">
+              <span className="eyebrow">#{(orderIndex ?? 0) + 1}</span>
+              <span className="mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+                Drag to reorder
+              </span>
+            </div>
+          ) : null}
           <h4 className="text-xl font-medium tracking-tight">
-            <Link className="transition-colors hover:opacity-60" href={`/cities/${city.id}`}>
+            <Link
+              className="transition-colors hover:opacity-60"
+              href={`/cities/${city.id}`}
+            >
               {city.name}
             </Link>
           </h4>
@@ -205,11 +344,11 @@ export function CityPreferences() {
                 ? "bg-[var(--ink)] border-[var(--ink)] text-white hover:opacity-80"
                 : "bg-transparent border-[var(--ink)] text-[var(--ink)] hover:bg-[var(--ink)] hover:text-white"
             }`}
-            disabled={busyCityId === city.id}
+            disabled={busyCityId === city.id || reordering}
             onClick={() => void toggleFavorite(city.id)}
             type="button"
           >
-            {busyCityId === city.id
+            {busyCityId === city.id || (reordering && isFavorite)
               ? "Saving..."
               : isFavorite
                 ? "- Remove"
@@ -222,7 +361,7 @@ export function CityPreferences() {
 
   return (
     <section className="space-y-16">
-      <div className="grid grid-cols-2 gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-4">
+      <div className="grid gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-[0.7fr_0.9fr_1.4fr]">
         <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Saved cities</p>
           <p className="text-4xl font-semibold tracking-tighter">
@@ -230,12 +369,13 @@ export function CityPreferences() {
           </p>
         </div>
         <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Available</p>
-          <p className="text-4xl font-semibold tracking-tighter">
-            {cities.length - favoriteIds.length}
+          <p className="eyebrow mb-2">Personal order</p>
+          <p className="text-2xl font-medium tracking-tight">Drag to rank</p>
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            Saved cities appear on the dashboard in this exact order.
           </p>
         </div>
-        <div className="card-shell-strong col-span-2 p-5">
+        <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Unit Preference</p>
           <div className="mt-2 flex gap-3 text-sm">
             <button
@@ -287,20 +427,35 @@ export function CityPreferences() {
       ) : null}
 
       <section className="space-y-8">
-        <div>
-          <p className="eyebrow mb-3">Saved</p>
-          <div className="flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
+        <div className="space-y-4">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="eyebrow mb-3">Saved</p>
+              <p className="text-sm text-[var(--ink-soft)]">
+                Your dashboard follows this order. Drag any saved city to move it up or down.
+              </p>
+            </div>
+            {reordering ? (
+              <p className="mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+                Updating order…
+              </p>
+            ) : null}
+          </div>
+
+          <div className="card-shell overflow-hidden">
+            <div className="flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
             {savedCities.length > 0 ? (
-              savedCities.map((city) => renderCityRow(city, true))
+              savedCities.map((city, index) => renderCityRow(city, true, index))
             ) : (
-              <div className="py-10 text-sm text-[var(--ink-soft)]">
+              <div className="px-4 py-10 text-sm text-[var(--ink-soft)]">
                 No saved cities yet. Add a few below to personalize your dashboard.
               </div>
             )}
+            </div>
           </div>
         </div>
 
-        <div>
+        <div className="space-y-4">
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="eyebrow mb-3">Add More</p>
@@ -310,14 +465,16 @@ export function CityPreferences() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
+          <div className="card-shell overflow-hidden">
+            <div className="mt-4 flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
             {availableCities.length > 0 ? (
               availableCities.map((city) => renderCityRow(city, false))
             ) : (
-              <div className="py-10 text-sm text-[var(--ink-soft)]">
+              <div className="px-4 py-10 text-sm text-[var(--ink-soft)]">
                 No additional cities match your current search.
               </div>
             )}
+            </div>
           </div>
         </div>
       </section>

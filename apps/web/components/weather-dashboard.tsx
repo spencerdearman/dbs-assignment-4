@@ -78,7 +78,11 @@ export function WeatherDashboard() {
 
     if (userId) {
       const [favoritesResult, profileResult] = await Promise.all([
-        supabase.from("user_city_preferences").select("city_id"),
+        supabase
+          .from("user_city_preferences")
+          .select("city_id, sort_order, created_at")
+          .order("sort_order")
+          .order("created_at"),
         supabase.from("user_profiles").select("*").maybeSingle(),
       ]);
 
@@ -233,8 +237,11 @@ export function WeatherDashboard() {
   const sortedCities = [...cities].sort((left, right) =>
     left.name.localeCompare(right.name),
   );
+  const cityMap = new Map(cities.map((city) => [city.id, city]));
   const visibleCities = isSignedIn
-    ? sortedCities.filter((city) => favoriteIds.includes(city.id))
+    ? favoriteIds
+        .map((cityId) => cityMap.get(cityId))
+        .filter((city): city is CityRecord => Boolean(city))
     : sortedCities.filter((city) => city.is_featured);
   const hottestCity = visibleCities
     .filter((city) => snapshots[city.id])
@@ -242,18 +249,21 @@ export function WeatherDashboard() {
       (left, right) =>
         snapshots[right.id].temperature_c - snapshots[left.id].temperature_c,
     )[0];
-  const activeCitiesCount = visibleCities.filter((city) => snapshots[city.id]).length;
+  const wettestCity = visibleCities
+    .filter((city) => snapshots[city.id])
+    .sort(
+      (left, right) =>
+        snapshots[right.id].precipitation_mm - snapshots[left.id].precipitation_mm,
+    )[0];
 
   return (
     <section className="space-y-16">
-      <div className="grid grid-cols-2 gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-3">
         <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Visible Cities</p>
-          <p className="text-4xl font-semibold tracking-tighter">{visibleCities.length}</p>
-        </div>
-        <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Live Rows</p>
-          <p className="text-4xl font-semibold tracking-tighter">{activeCitiesCount}</p>
+          <p className="text-4xl font-semibold tracking-tighter">
+            {visibleCities.length}
+          </p>
         </div>
         <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Warmest City</p>
@@ -262,19 +272,14 @@ export function WeatherDashboard() {
           </p>
         </div>
         <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Worker Status</p>
-          <p className="text-xl font-medium tracking-tight">
-            {workerStatus?.last_success_at ? "Healthy" : "Waiting"}
+          <p className="eyebrow mb-2">Wettest Right Now</p>
+          <p className="text-4xl font-semibold tracking-tighter">
+            {wettestCity ? wettestCity.name : "N/A"}
           </p>
-          <p className="mt-1 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
-            {workerStatus?.last_success_at
-              ? formatRelativeTime(workerStatus.last_success_at)
-              : workerStatus?.last_run_at
-                ? `Last run ${formatRelativeTime(workerStatus.last_run_at)}`
-                : "No polls"}
-          </p>
-          <p className="mt-1 text-[0.65rem] text-[var(--ink-soft)]">
-            {workerStatus?.last_error ?? "Railway worker should poll every 15 minutes."}
+          <p className="mt-2 text-sm text-[var(--ink-soft)]">
+            {wettestCity && snapshots[wettestCity.id]
+              ? `${snapshots[wettestCity.id].precipitation_mm.toFixed(1)} mm precipitation`
+              : "No measurable precipitation"}
           </p>
         </div>
       </div>
@@ -285,6 +290,11 @@ export function WeatherDashboard() {
           <h2 className="text-2xl font-medium tracking-tight">
             {isSignedIn ? "Your Subscribed Locations" : "Featured Network Feed"}
           </h2>
+          <p className="mt-2 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+            {workerStatus?.last_success_at
+              ? `Background refresh ${formatRelativeTime(workerStatus.last_success_at)}`
+              : "Background refresh status will appear after the next poll."}
+          </p>
         </div>
 
         <div className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">

@@ -46,9 +46,13 @@ create table if not exists public.user_city_preferences (
   id uuid primary key default gen_random_uuid(),
   user_id text not null default (auth.jwt()->>'sub'),
   city_id text not null references public.cities(id) on delete cascade,
+  sort_order integer not null default 0,
   created_at timestamptz not null default timezone('utc', now()),
   unique(user_id, city_id)
 );
+
+create index if not exists user_city_preferences_user_order_idx
+on public.user_city_preferences (user_id, sort_order, created_at);
 
 create table if not exists public.worker_status (
   id text primary key,
@@ -147,6 +151,14 @@ on public.user_city_preferences
 for delete
 to authenticated
 using ((select auth.jwt()->>'sub') = user_id);
+
+drop policy if exists "users can update their favorite cities" on public.user_city_preferences;
+create policy "users can update their favorite cities"
+on public.user_city_preferences
+for update
+to authenticated
+using ((select auth.jwt()->>'sub') = user_id)
+with check ((select auth.jwt()->>'sub') = user_id);
 
 insert into public.worker_status (
   id,
