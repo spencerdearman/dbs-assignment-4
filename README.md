@@ -36,7 +36,7 @@ Open-Meteo is free and does not require an API key.
 You only need:
 
 - Supabase project URL
-- Supabase anon key
+- Supabase anon key or publishable key
 - Supabase service role key
 - Your deployed Vercel URL for `NEXT_PUBLIC_SITE_URL`
 

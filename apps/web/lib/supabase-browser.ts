@@ -8,14 +8,16 @@ export function createSupabaseBrowserClient() {
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const publicKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!url || !anonKey) {
+  if (!url || !publicKey) {
     browserClient = null;
     return browserClient;
   }
 
-  browserClient = createClient(url, anonKey, {
+  browserClient = createClient(url, publicKey, {
     auth: {
       autoRefreshToken: true,
       detectSessionInUrl: true,
@@ -25,4 +27,3 @@ export function createSupabaseBrowserClient() {
 
   return browserClient;
 }
-
