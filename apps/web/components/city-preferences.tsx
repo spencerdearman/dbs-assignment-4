@@ -12,12 +12,8 @@ import { useAuth } from "@/components/auth-provider";
 import type {
   CityRecord,
   TemperatureUnit,
-  UserCityPreferenceRecord,
 } from "@/lib/types";
-import {
-  formatSupabaseRequestError,
-  isMissingColumnError,
-} from "@/lib/supabase-browser";
+import { formatSupabaseRequestError } from "@/lib/supabase-browser";
 
 const ORDER_BASE_TIME = Date.parse("2000-01-01T00:00:00.000Z");
 
@@ -34,7 +30,6 @@ export function CityPreferences() {
   const [dropTargetCityId, setDropTargetCityId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [usesSortColumn, setUsesSortColumn] = useState(true);
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -44,42 +39,18 @@ export function CityPreferences() {
     if (!supabase) {
       return {
         data: [],
-        supportsCustomOrder: false,
         error: null,
       };
     }
 
     const orderedResult = await supabase
       .from("user_city_preferences")
-      .select("city_id, sort_order, created_at")
-      .order("sort_order")
-      .order("created_at");
-
-    if (!orderedResult.error) {
-      return {
-        data: orderedResult.data ?? [],
-        usesSortColumn: true,
-        error: null,
-      };
-    }
-
-    if (!isMissingColumnError(orderedResult.error.message, "sort_order")) {
-      return {
-        data: [],
-        usesSortColumn: false,
-        error: orderedResult.error,
-      };
-    }
-
-    const fallbackResult = await supabase
-      .from("user_city_preferences")
       .select("city_id, created_at")
       .order("created_at");
 
     return {
-      data: fallbackResult.data ?? [],
-      usesSortColumn: false,
-      error: fallbackResult.error,
+      data: orderedResult.data ?? [],
+      error: orderedResult.error,
     };
   }
 
@@ -116,7 +87,6 @@ export function CityPreferences() {
       setFavoriteIds(
         (favoritesResult.data ?? []).map((row) => row.city_id),
       );
-      setUsesSortColumn(favoritesResult.usesSortColumn ?? false);
       setPreferredUnit(profileResult.data?.preferred_unit ?? "fahrenheit");
       setLoading(false);
     });
@@ -128,44 +98,27 @@ export function CityPreferences() {
     }
 
     setReordering(true);
+    const orderedPayload = orderedCityIds.map((cityId, index) => ({
+      user_id: userId,
+      city_id: cityId,
+      created_at: new Date(ORDER_BASE_TIME + index * 1000).toISOString(),
+    }));
+
+    const deleteResult = await supabase
+      .from("user_city_preferences")
+      .delete()
+      .eq("user_id", userId);
 
     let error: { message: string } | null = null;
 
-    if (usesSortColumn) {
-      const payload: UserCityPreferenceRecord[] = orderedCityIds.map(
-        (cityId, index) => ({
-          user_id: userId,
-          city_id: cityId,
-          sort_order: index,
-        }),
-      );
-
-      const result = await supabase.from("user_city_preferences").upsert(payload, {
-        onConflict: "user_id,city_id",
-      });
-
-      error = result.error;
+    if (deleteResult.error) {
+      error = deleteResult.error;
     } else {
-      const orderedPayload = orderedCityIds.map((cityId, index) => ({
-        user_id: userId,
-        city_id: cityId,
-        created_at: new Date(ORDER_BASE_TIME + index * 1000).toISOString(),
-      }));
-
-      const deleteResult = await supabase
+      const insertResult = await supabase
         .from("user_city_preferences")
-        .delete()
-        .eq("user_id", userId);
+        .insert(orderedPayload);
 
-      if (deleteResult.error) {
-        error = deleteResult.error;
-      } else {
-        const insertResult = await supabase
-          .from("user_city_preferences")
-          .insert(orderedPayload);
-
-        error = insertResult.error;
-      }
+      error = insertResult.error;
     }
 
     setReordering(false);
@@ -200,14 +153,9 @@ export function CityPreferences() {
     const result = isFavorite
       ? await supabase.from("user_city_preferences").delete().eq("city_id", cityId)
       : await supabase.from("user_city_preferences").insert(
-          usesSortColumn
-            ? {
-                city_id: cityId,
-                sort_order: favoriteIds.length,
-              }
-            : {
-                city_id: cityId,
-              },
+          {
+            city_id: cityId,
+          },
         );
 
     setBusyCityId(null);

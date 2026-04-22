@@ -19,7 +19,6 @@ import {
 } from "@/lib/weather";
 import {
   formatSupabaseRequestError,
-  isMissingColumnError,
 } from "@/lib/supabase-browser";
 
 function snapshotMapFromRows(rows: WeatherSnapshotRecord[]) {
@@ -47,32 +46,12 @@ export function WeatherDashboard() {
 
     const orderedResult = await supabase
       .from("user_city_preferences")
-      .select("city_id, sort_order, created_at")
-      .order("sort_order")
-      .order("created_at");
-
-    if (!orderedResult.error) {
-      return {
-        data: orderedResult.data ?? [],
-        error: null,
-      };
-    }
-
-    if (!isMissingColumnError(orderedResult.error.message, "sort_order")) {
-      return {
-        data: [],
-        error: orderedResult.error,
-      };
-    }
-
-    const fallbackResult = await supabase
-      .from("user_city_preferences")
       .select("city_id, created_at")
       .order("created_at");
 
     return {
-      data: fallbackResult.data ?? [],
-      error: fallbackResult.error,
+      data: orderedResult.data ?? [],
+      error: orderedResult.error,
     };
   }
 
@@ -399,10 +378,12 @@ export function WeatherDashboard() {
               >
                 <article
                   className="card-shell dashboard-city-card h-full p-6 transition-transform duration-200 group-hover:-translate-y-0.5"
-                  style={{
-                    backgroundImage: `linear-gradient(180deg, ${condition.accent} 0%, rgba(255,255,255,0) 38%)`,
-                  }}
                 >
+                  <div
+                    className="mb-5 h-1.5 w-16 rounded-full"
+                    style={{ backgroundColor: condition.accent }}
+                  />
+
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="eyebrow mb-3">Saved city</p>

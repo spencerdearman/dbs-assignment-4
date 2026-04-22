@@ -1,6 +1,12 @@
 "use client";
 
-import { startTransition, useEffect, useEffectEvent, useMemo, useState } from "react";
+import {
+  startTransition,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useState,
+} from "react";
 import { useAuth } from "@/components/auth-provider";
 import type { WorkerStatusRecord } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/weather";
@@ -20,10 +26,10 @@ function formatTimestamp(value: string | null) {
 function getWorkerHealth(status: WorkerStatusRecord | null) {
   if (!status) {
     return {
-      label: "Failed",
-      detail: "No worker status row is available yet.",
-      tone: "text-red-600",
-      accent: "rgba(190, 24, 93, 0.18)",
+      label: "Unavailable",
+      detail: "Worker status has not been published yet.",
+      tone: "text-[var(--ink)]",
+      solid: "#cfcfcf",
     };
   }
 
@@ -40,7 +46,7 @@ function getWorkerHealth(status: WorkerStatusRecord | null) {
       label: "Failed",
       detail: status.last_error ?? "The worker has not completed a successful poll yet.",
       tone: "text-red-600",
-      accent: "rgba(190, 24, 93, 0.18)",
+      solid: "#dc2626",
     };
   }
 
@@ -52,7 +58,7 @@ function getWorkerHealth(status: WorkerStatusRecord | null) {
         label: "Delayed",
         detail: status.last_error ?? "The latest poll has not fully recovered yet.",
         tone: "text-amber-600",
-        accent: "rgba(245, 158, 11, 0.18)",
+        solid: "#d97706",
       };
     }
 
@@ -60,7 +66,7 @@ function getWorkerHealth(status: WorkerStatusRecord | null) {
       label: "Failed",
       detail: status.last_error ?? "The worker is missing expected successful polls.",
       tone: "text-red-600",
-      accent: "rgba(190, 24, 93, 0.18)",
+      solid: "#dc2626",
     };
   }
 
@@ -69,7 +75,7 @@ function getWorkerHealth(status: WorkerStatusRecord | null) {
       label: "Healthy",
       detail: `Worker is polling within the ${status.poll_interval_minutes}-minute target window.`,
       tone: "text-emerald-700",
-      accent: "rgba(16, 185, 129, 0.16)",
+      solid: "#059669",
     };
   }
 
@@ -78,7 +84,7 @@ function getWorkerHealth(status: WorkerStatusRecord | null) {
       label: "Delayed",
       detail: "The worker is behind its normal polling window, but recent success still exists.",
       tone: "text-amber-600",
-      accent: "rgba(245, 158, 11, 0.18)",
+      solid: "#d97706",
     };
   }
 
@@ -86,13 +92,14 @@ function getWorkerHealth(status: WorkerStatusRecord | null) {
     label: "Failed",
     detail: "The worker has missed several expected polling windows.",
     tone: "text-red-600",
-    accent: "rgba(190, 24, 93, 0.18)",
+    solid: "#dc2626",
   };
 }
 
 export function WorkerHealthDashboard() {
   const { hasEnv, isReady, missingEnv, supabase } = useAuth();
   const [workerStatus, setWorkerStatus] = useState<WorkerStatusRecord | null>(null);
+  const [isDerivedStatus, setIsDerivedStatus] = useState(false);
   const [loading, setLoading] = useState(() => Boolean(supabase));
   const [error, setError] = useState<string | null>(null);
 
@@ -104,16 +111,26 @@ export function WorkerHealthDashboard() {
     setLoading(true);
     setError(null);
 
-    const { data, error: workerError } = await supabase
-      .from("worker_status")
-      .select("*")
-      .eq("id", "open-meteo-worker")
-      .maybeSingle();
+    const [workerResult, snapshotResult] = await Promise.all([
+      supabase
+        .from("worker_status")
+        .select("*")
+        .eq("id", "open-meteo-worker")
+        .maybeSingle(),
+      supabase
+        .from("weather_snapshots")
+        .select("updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    if (workerError) {
+    if (workerResult.error || snapshotResult.error) {
       setError(
         formatSupabaseRequestError(
-          workerError.message || "Failed to load worker health.",
+          workerResult.error?.message ||
+            snapshotResult.error?.message ||
+            "Failed to load worker health.",
           "worker health",
         ),
       );
@@ -121,8 +138,23 @@ export function WorkerHealthDashboard() {
       return;
     }
 
+    const derivedStatus =
+      !workerResult.data && snapshotResult.data?.updated_at
+        ? {
+            id: "open-meteo-worker",
+            source_name: "open-meteo",
+            poll_interval_minutes: 15,
+            last_run_at: snapshotResult.data.updated_at,
+            last_success_at: snapshotResult.data.updated_at,
+            last_error: null,
+            consecutive_error_count: 0,
+            updated_at: snapshotResult.data.updated_at,
+          }
+        : null;
+
     startTransition(() => {
-      setWorkerStatus(data ?? null);
+      setWorkerStatus(workerResult.data ?? derivedStatus);
+      setIsDerivedStatus(!workerResult.data && Boolean(derivedStatus));
       setLoading(false);
     });
   });
@@ -159,6 +191,42 @@ export function WorkerHealthDashboard() {
         (payload) => {
           startTransition(() => {
             setWorkerStatus(payload.new as WorkerStatusRecord);
+            setIsDerivedStatus(false);
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "weather_snapshots",
+        },
+        (payload) => {
+          if (!payload.new) {
+            return;
+          }
+
+          if (!isDerivedStatus) {
+            return;
+          }
+
+          const updatedAt =
+            (payload.new as { updated_at?: string }).updated_at ??
+            new Date().toISOString();
+
+          startTransition(() => {
+            setWorkerStatus({
+              id: "open-meteo-worker",
+              source_name: "open-meteo",
+              poll_interval_minutes: 15,
+              last_run_at: updatedAt,
+              last_success_at: updatedAt,
+              last_error: null,
+              consecutive_error_count: 0,
+              updated_at: updatedAt,
+            });
+            setIsDerivedStatus(true);
           });
         },
       )
@@ -167,7 +235,7 @@ export function WorkerHealthDashboard() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [supabase, isDerivedStatus]);
 
   const health = useMemo(() => getWorkerHealth(workerStatus), [workerStatus]);
 
@@ -206,13 +274,24 @@ export function WorkerHealthDashboard() {
 
           <div
             className="card-shell px-5 py-4"
-            style={{ backgroundColor: health.accent }}
+            style={{ borderTop: `3px solid ${health.solid}` }}
           >
             <p className="eyebrow mb-2">Current status</p>
-            <div className={`text-3xl font-medium tracking-tight ${health.tone}`}>
-              {health.label}
+            <div className="flex items-center gap-3">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: health.solid }}
+              />
+              <div className={`text-3xl font-medium tracking-tight ${health.tone}`}>
+                {health.label}
+              </div>
             </div>
             <p className="mt-2 max-w-sm text-sm text-[var(--ink)]">{health.detail}</p>
+            {isDerivedStatus ? (
+              <p className="mt-3 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+                Showing snapshot-derived freshness while the worker status row is unavailable.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
