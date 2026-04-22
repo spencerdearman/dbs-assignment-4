@@ -1,69 +1,135 @@
 # Cloud
 
-A weather-focused version of the Week 4 "build a system" assignment:
+Cloud is a weather app built as a small multi-service system:
 
-Open-Meteo -> Railway worker -> Supabase -> Next.js frontend on Vercel
+- `apps/web` is the Next.js frontend
+- `apps/worker` is the background polling worker
+- Supabase stores app data and powers realtime updates
+- Clerk handles authentication
 
-The repo follows the class monorepo structure:
+The worker pulls weather data from Open-Meteo, writes the latest conditions into Supabase, and the frontend reads from Supabase and updates live through Realtime.
 
-- `apps/web` - Next.js + Tailwind frontend
-- `apps/worker` - Node.js polling worker for Open-Meteo
-- `supabase/schema.sql` - tables, RLS policies, and Realtime setup
-- `supabase/clerk-migration.sql` - migration from Supabase Auth-style user ids to Clerk user ids
-- `CLAUDE.md` - architecture blueprint for the whole system
+## Stack
 
-## What the app does
+- Next.js App Router
+- Tailwind CSS
+- Supabase
+- Clerk
+- Railway
+- Vercel
+- Open-Meteo
 
-- Uses Clerk for sign up / sign in, including Google sign in when enabled
-- Lets each user choose favorite cities
-- Stores a preferred temperature unit per user
-- Polls Open-Meteo on a background interval
-- Upserts live conditions into Supabase
-- Streams updates into the frontend with Supabase Realtime
+## Repo layout
+
+```text
+apps/
+  web/       Next.js frontend
+  worker/    Node.js polling worker
+supabase/
+  schema.sql
+  clerk-migration.sql
+  reorder-migration.sql
+  worker-health-migration.sql
+CLAUDE.md    Architecture notes
+```
+
+## Features
+
+- Email/password or Google sign-in through Clerk
+- Saved cities per user
+- Temperature unit preference
+- Live dashboard updates through Supabase Realtime
+- City detail pages with current conditions, forecast, radar, and sun timing
+- Worker health page with poll status, timestamps, and latest worker message
 
 ## Local setup
 
-1. In Supabase, create a new project.
-2. If you are setting up from scratch, run [supabase/schema.sql](/Users/spencerdearman/dbs-assignment-4/supabase/schema.sql:1).
-3. If you already ran the earlier Supabase Auth version, run [supabase/clerk-migration.sql](/Users/spencerdearman/dbs-assignment-4/supabase/clerk-migration.sql:1).
-4. Add frontend env vars to `apps/web/.env.local` using [apps/web/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/web/.env.example:1).
-5. Add worker env vars to `apps/worker/.env` using [apps/worker/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/worker/.env.example:1).
-6. Start the frontend with `npm run dev:web`.
-7. Start the worker with `npm run dev:worker`.
+### 1. Create the Supabase schema
 
-## Required keys
+Run:
 
-Open-Meteo is free and does not require an API key.
+- [supabase/schema.sql](/Users/spencerdearman/dbs-assignment-4/supabase/schema.sql:1)
 
-You only need:
+If you are updating an older version of the project, these migrations may also apply:
 
-- Supabase project URL
-- Supabase publishable key
-- Supabase service role key
-- Clerk publishable key
-- Clerk secret key
-- Your deployed Vercel URL for `NEXT_PUBLIC_SITE_URL`
+- [supabase/clerk-migration.sql](/Users/spencerdearman/dbs-assignment-4/supabase/clerk-migration.sql:1)
+- [supabase/reorder-migration.sql](/Users/spencerdearman/dbs-assignment-4/supabase/reorder-migration.sql:1)
+- [supabase/worker-health-migration.sql](/Users/spencerdearman/dbs-assignment-4/supabase/worker-health-migration.sql:1)
+
+### 2. Add environment variables
+
+Frontend:
+
+- copy [apps/web/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/web/.env.example:1) to `apps/web/.env.local`
+
+Worker:
+
+- copy [apps/worker/.env.example](/Users/spencerdearman/dbs-assignment-4/apps/worker/.env.example:1) to `apps/worker/.env`
+
+Required values:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `POLL_INTERVAL_MINUTES`
+
+Open-Meteo does not require an API key.
+
+### 3. Run the app
+
+From the repo root:
+
+```bash
+npm run dev:web
+```
+
+In a second terminal:
+
+```bash
+npm run dev:worker
+```
+
+## Useful scripts
+
+From the repo root:
+
+```bash
+npm run dev:web
+npm run build:web
+npm run lint:web
+npm run dev:worker
+npm run start:worker
+```
 
 ## Deployment
 
-### Vercel
+### Frontend
 
-- Import the repo
-- Set the root directory to `apps/web`
-- Add the same frontend env vars from `apps/web/.env.local`
+Deploy `apps/web` to Vercel.
 
-### Railway
+Make sure Vercel has the frontend env vars from `apps/web/.env.local`.
 
-- Create a new service from this repo
-- Set the root directory to `apps/worker`
-- Add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `POLL_INTERVAL_MINUTES`
+### Worker
+
+Deploy `apps/worker` to Railway.
+
+Make sure Railway has:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `POLL_INTERVAL_MINUTES`
+
+## Notes
+
+- The frontend expects `NEXT_PUBLIC_SUPABASE_URL` to point to your Supabase project, not your Vercel domain.
+- The worker is responsible for keeping `weather_snapshots` and `worker_status` fresh.
+- Realtime subscriptions listen to `weather_snapshots` and `worker_status`.
+- Project structure and architecture notes are documented in [CLAUDE.md](/Users/spencerdearman/dbs-assignment-4/CLAUDE.md:1).
 
 ## Supabase MCP
 
-The assignment asks for Supabase MCP to be configured. The classroom command from the assignment is:
-
-```bash
-claude mcp add --transport http supabase https://mcp.supabase.com/mcp
-```
-
-Codex does not configure that MCP server from inside this repo, so that is one of the small account-level steps you will do yourself.
+If you need the Supabase MCP server for the assignment, configure it separately in your local Claude/Codex setup. That is an account-level tool setup, not something this repo installs by itself.
