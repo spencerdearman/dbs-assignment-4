@@ -99,6 +99,50 @@ function formatVisibility(valueMeters?: number | null) {
   return `${(valueMeters / 1000).toFixed(1)} km`;
 }
 
+function getLocalClockMinutes(timezone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: timezone,
+  });
+  const parts = formatter.formatToParts(new Date());
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  return hour * 60 + minute;
+}
+
+function getClockMinutes(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/T(\d{2}):(\d{2})/);
+
+  if (!match) {
+    return null;
+  }
+
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function formatClockMinutes(minutes?: number | null) {
+  if (minutes == null) {
+    return "--";
+  }
+
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+  const hour24 = Math.floor(normalized / 60);
+  const minute = normalized % 60;
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const meridiem = hour24 >= 12 ? "PM" : "AM";
+  return `${hour12}:${String(minute).padStart(2, "0")} ${meridiem}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function formatCompassDirection(degrees?: number | null) {
   if (degrees == null) {
     return "--";
@@ -396,6 +440,64 @@ export function CityDetail({ cityId }: { cityId: string }) {
   const sunrise = daily?.sunrise?.[0];
   const sunset = daily?.sunset?.[0];
   const maxUv = daily?.uv_index_max?.[0] ?? null;
+  const sunriseMinutes = getClockMinutes(sunrise);
+  const sunsetMinutes = getClockMinutes(sunset);
+  const localClockMinutes = getLocalClockMinutes(city.timezone);
+  const daylightSpan =
+    sunriseMinutes != null && sunsetMinutes != null
+      ? Math.max(1, sunsetMinutes - sunriseMinutes)
+      : null;
+  const daylightProgress =
+    sunriseMinutes != null && sunsetMinutes != null && daylightSpan != null
+      ? clamp((localClockMinutes - sunriseMinutes) / daylightSpan, 0, 1)
+      : null;
+  const daylightRemainingMinutes =
+    sunsetMinutes != null ? Math.max(0, sunsetMinutes - localClockMinutes) : null;
+  const daylightProgressLabel =
+    daylightProgress == null
+      ? "--"
+      : `${Math.round(daylightProgress * 100)}% of daylight`;
+  const goldenHourSummary = (() => {
+    if (sunriseMinutes == null || sunsetMinutes == null) {
+      return { label: "--", detail: "Golden-hour timing unavailable" };
+    }
+
+    const morningGoldenEnd = sunriseMinutes + 60;
+    const eveningGoldenStart = sunsetMinutes - 60;
+
+    if (localClockMinutes >= sunriseMinutes && localClockMinutes <= morningGoldenEnd) {
+      return {
+        label: "Live now",
+        detail: `Morning golden hour until ${formatClockMinutes(morningGoldenEnd)}`,
+      };
+    }
+
+    if (localClockMinutes >= eveningGoldenStart && localClockMinutes <= sunsetMinutes) {
+      return {
+        label: "Live now",
+        detail: `Evening golden hour until ${formatShortTime(sunset)}`,
+      };
+    }
+
+    if (localClockMinutes < sunriseMinutes) {
+      return {
+        label: "Morning window",
+        detail: `Starts near ${formatShortTime(sunrise)}`,
+      };
+    }
+
+    if (localClockMinutes < eveningGoldenStart) {
+      return {
+        label: "Evening window",
+        detail: `Starts near ${formatClockMinutes(eveningGoldenStart)}`,
+      };
+    }
+
+    return {
+      label: "Tomorrow morning",
+      detail: `Returns near ${formatShortTime(sunrise)}`,
+    };
+  })();
 
   return (
     <section className="space-y-10 py-8">
@@ -518,7 +620,7 @@ export function CityDetail({ cityId }: { cityId: string }) {
           </h3>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <article className="card-shell-strong p-5">
             <p className="eyebrow mb-3">High / Low</p>
             <div className="text-3xl font-medium tracking-tight">
@@ -535,6 +637,26 @@ export function CityDetail({ cityId }: { cityId: string }) {
             </div>
             <p className="mt-2 text-sm text-[var(--ink-soft)]">
               Sunset {formatShortTime(sunset)}
+            </p>
+          </article>
+          <article className="card-shell-strong p-5">
+            <p className="eyebrow mb-3">Daylight</p>
+            <div className="text-3xl font-medium tracking-tight">
+              {daylightProgressLabel}
+            </div>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              {daylightRemainingMinutes != null
+                ? `${Math.floor(daylightRemainingMinutes / 60)}h ${daylightRemainingMinutes % 60}m until sunset`
+                : "Sun position unavailable"}
+            </p>
+          </article>
+          <article className="card-shell-strong p-5">
+            <p className="eyebrow mb-3">Golden Hour</p>
+            <div className="text-3xl font-medium tracking-tight">
+              {goldenHourSummary.label}
+            </div>
+            <p className="mt-2 text-sm text-[var(--ink-soft)]">
+              {goldenHourSummary.detail}
             </p>
           </article>
           <article className="card-shell-strong p-5">

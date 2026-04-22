@@ -378,7 +378,7 @@ export function WeatherDashboard() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {visibleCities.map((city) => {
             const snapshot = snapshots[city.id];
             const condition = snapshot
@@ -386,53 +386,80 @@ export function WeatherDashboard() {
               : { label: "Awaiting Sync", accent: "rgba(17, 17, 17, 0.22)" };
 
             return (
-              <article
+              <Link
+                className="group block"
+                href={`/cities/${city.id}`}
                 key={city.id}
-                className="flex flex-col justify-between gap-5 py-6 transition-colors hover:bg-[var(--surface-strong)] md:flex-row md:items-center"
               >
-                <div className="w-full md:w-1/3">
-                  <h3 className="text-xl font-medium tracking-tight">
-                    <Link className="transition-colors hover:opacity-60" href={`/cities/${city.id}`}>
-                      {city.name}
-                    </Link>
-                  </h3>
-                  <div className="mt-2 text-sm text-[var(--ink-soft)]">
-                    {city.region} · {getCityLocalTime(city.timezone)}
-                  </div>
-                </div>
-
-                {snapshot ? (
-                  <div className="flex w-full items-end justify-between gap-6 md:w-2/3 md:items-center">
-                    <div className="flex flex-col gap-2">
-                      <span className="flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
-                        <span
-                          className="pill-dot"
-                          style={{ backgroundColor: condition.accent }}
-                        />
-                        {condition.label}
-                      </span>
-                      <span className="mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
-                        Rain {snapshot.precipitation_mm.toFixed(1)}mm · Hum{" "}
-                        {snapshot.relative_humidity}% · Wind{" "}
-                        {formatWind(snapshot.wind_speed_kph)}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-4xl font-medium tracking-tight sm:text-5xl">
-                        {formatTemperature(snapshot.temperature_c, preferredUnit)}
-                      </div>
-                      <div className="mt-1 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
-                        Feels {formatTemperature(snapshot.apparent_temperature_c, preferredUnit)}
+                <article
+                  className="card-shell dashboard-city-card h-full p-6 transition-transform duration-200 group-hover:-translate-y-0.5"
+                  style={{
+                    backgroundImage: `linear-gradient(180deg, ${condition.accent} 0%, rgba(255,255,255,0) 38%)`,
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="eyebrow mb-3">Saved city</p>
+                      <h3 className="text-2xl font-medium tracking-tight">
+                        {city.name}
+                      </h3>
+                      <div className="mt-2 text-sm text-[var(--ink-soft)]">
+                        {city.region} · {getCityLocalTime(city.timezone)}
                       </div>
                     </div>
+
+                    {snapshot ? (
+                      <div className="text-right">
+                        <div className="text-5xl font-medium tracking-tight">
+                          {formatTemperature(snapshot.temperature_c, preferredUnit)}
+                        </div>
+                        <div className="mt-2 mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
+                          Feels {formatTemperature(snapshot.apparent_temperature_c, preferredUnit)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mono text-xs tracking-widest text-[var(--ink-soft)]">
+                        Sync pending
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="w-full text-right mono text-xs tracking-widest text-[var(--ink-soft)] md:w-2/3">
-                    Sync pending...
+
+                  <div className="mt-8 flex items-center gap-2 text-sm font-medium text-[var(--ink)]">
+                    <span
+                      className="pill-dot"
+                      style={{ backgroundColor: condition.accent }}
+                    />
+                    {condition.label}
                   </div>
-                )}
-              </article>
+
+                  {snapshot ? (
+                    <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border)] pt-5">
+                      <div>
+                        <p className="eyebrow mb-2">Rain</p>
+                        <p className="text-base font-medium">
+                          {snapshot.precipitation_mm.toFixed(1)} mm
+                        </p>
+                      </div>
+                      <div>
+                        <p className="eyebrow mb-2">Humidity</p>
+                        <p className="text-base font-medium">
+                          {snapshot.relative_humidity}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="eyebrow mb-2">Wind</p>
+                        <p className="text-base font-medium">
+                          {formatWind(snapshot.wind_speed_kph)}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 border-t border-[var(--border)] pt-5 mono text-xs tracking-widest text-[var(--ink-soft)]">
+                      Awaiting the next worker refresh.
+                    </div>
+                  )}
+                </article>
+              </Link>
             );
           })}
         </div>

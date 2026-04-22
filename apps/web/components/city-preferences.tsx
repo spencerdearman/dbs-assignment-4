@@ -19,6 +19,8 @@ import {
   isMissingColumnError,
 } from "@/lib/supabase-browser";
 
+const ORDER_BASE_TIME = Date.parse("2000-01-01T00:00:00.000Z");
+
 export function CityPreferences() {
   const { hasEnv, isReady, isSignedIn, missingEnv, supabase, userId } =
     useAuth();
@@ -32,7 +34,7 @@ export function CityPreferences() {
   const [dropTargetCityId, setDropTargetCityId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [supportsCustomOrder, setSupportsCustomOrder] = useState(true);
+  const [usesSortColumn, setUsesSortColumn] = useState(true);
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -56,7 +58,7 @@ export function CityPreferences() {
     if (!orderedResult.error) {
       return {
         data: orderedResult.data ?? [],
-        supportsCustomOrder: true,
+        usesSortColumn: true,
         error: null,
       };
     }
@@ -64,7 +66,7 @@ export function CityPreferences() {
     if (!isMissingColumnError(orderedResult.error.message, "sort_order")) {
       return {
         data: [],
-        supportsCustomOrder: false,
+        usesSortColumn: false,
         error: orderedResult.error,
       };
     }
@@ -76,7 +78,7 @@ export function CityPreferences() {
 
     return {
       data: fallbackResult.data ?? [],
-      supportsCustomOrder: false,
+      usesSortColumn: false,
       error: fallbackResult.error,
     };
   }
@@ -114,30 +116,57 @@ export function CityPreferences() {
       setFavoriteIds(
         (favoritesResult.data ?? []).map((row) => row.city_id),
       );
-      setSupportsCustomOrder(favoritesResult.supportsCustomOrder);
+      setUsesSortColumn(favoritesResult.usesSortColumn ?? false);
       setPreferredUnit(profileResult.data?.preferred_unit ?? "fahrenheit");
       setLoading(false);
     });
   });
 
   async function persistFavoriteOrder(orderedCityIds: string[]) {
-    if (!supabase || !userId || orderedCityIds.length === 0 || !supportsCustomOrder) {
+    if (!supabase || !userId || orderedCityIds.length === 0) {
       return;
     }
 
     setReordering(true);
 
-    const payload: UserCityPreferenceRecord[] = orderedCityIds.map(
-      (cityId, index) => ({
+    let error: { message: string } | null = null;
+
+    if (usesSortColumn) {
+      const payload: UserCityPreferenceRecord[] = orderedCityIds.map(
+        (cityId, index) => ({
+          user_id: userId,
+          city_id: cityId,
+          sort_order: index,
+        }),
+      );
+
+      const result = await supabase.from("user_city_preferences").upsert(payload, {
+        onConflict: "user_id,city_id",
+      });
+
+      error = result.error;
+    } else {
+      const orderedPayload = orderedCityIds.map((cityId, index) => ({
         user_id: userId,
         city_id: cityId,
-        sort_order: index,
-      }),
-    );
+        created_at: new Date(ORDER_BASE_TIME + index * 1000).toISOString(),
+      }));
 
-    const { error } = await supabase.from("user_city_preferences").upsert(payload, {
-      onConflict: "user_id,city_id",
-    });
+      const deleteResult = await supabase
+        .from("user_city_preferences")
+        .delete()
+        .eq("user_id", userId);
+
+      if (deleteResult.error) {
+        error = deleteResult.error;
+      } else {
+        const insertResult = await supabase
+          .from("user_city_preferences")
+          .insert(orderedPayload);
+
+        error = insertResult.error;
+      }
+    }
 
     setReordering(false);
 
@@ -171,7 +200,7 @@ export function CityPreferences() {
     const result = isFavorite
       ? await supabase.from("user_city_preferences").delete().eq("city_id", cityId)
       : await supabase.from("user_city_preferences").insert(
-          supportsCustomOrder
+          usesSortColumn
             ? {
                 city_id: cityId,
                 sort_order: favoriteIds.length,
@@ -192,7 +221,7 @@ export function CityPreferences() {
       setFavoriteIds(nextFavoriteIds);
     });
 
-    if (isFavorite && nextFavoriteIds.length > 0 && supportsCustomOrder) {
+    if (isFavorite && nextFavoriteIds.length > 0) {
       await persistFavoriteOrder(nextFavoriteIds);
     }
   }
@@ -329,12 +358,12 @@ export function CityPreferences() {
 
     return (
       <article
-        className={`flex flex-col justify-between gap-4 py-6 transition-colors md:flex-row md:items-center ${
-          isFavorite ? "px-4" : ""
+        className={`flex flex-col justify-between gap-5 px-6 py-6 transition-colors md:flex-row md:items-center md:gap-8 ${
+          isFavorite ? "" : ""
         } ${isDropTarget ? "bg-[var(--surface-strong)]" : "hover:bg-[var(--surface-strong)]"} ${
           isDragging ? "opacity-50" : ""
         }`}
-        draggable={isFavorite && supportsCustomOrder && !reordering}
+        draggable={isFavorite && !reordering}
         key={city.id}
         onDragEnd={() => {
           setDraggedCityId(null);
@@ -370,7 +399,7 @@ export function CityPreferences() {
             <div className="mb-3 flex items-center gap-3">
               <span className="eyebrow">#{(orderIndex ?? 0) + 1}</span>
               <span className="mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
-                {supportsCustomOrder ? "Drag to reorder" : "Saved order"}
+                Drag to reorder
               </span>
             </div>
           ) : null}
@@ -387,7 +416,7 @@ export function CityPreferences() {
             {city.longitude.toFixed(4)}
           </div>
         </div>
-        <div className="flex md:justify-end w-full md:w-1/3">
+        <div className="flex w-full md:w-1/3 md:justify-end">
           <button
             className={`rounded-full border px-5 py-2 text-sm transition-colors ${
               isFavorite
@@ -411,7 +440,7 @@ export function CityPreferences() {
 
   return (
     <section className="space-y-16">
-      <div className="grid gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-[0.7fr_0.9fr_1.4fr]">
+      <div className="grid gap-4 border-b border-t border-[var(--border)] py-8 md:grid-cols-[0.75fr_1.15fr]">
         <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Saved cities</p>
           <p className="text-4xl font-semibold tracking-tighter">
@@ -420,17 +449,12 @@ export function CityPreferences() {
         </div>
         <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Personal order</p>
-          <p className="text-2xl font-medium tracking-tight">
-            {supportsCustomOrder ? "Drag to rank" : "Migration needed"}
-          </p>
+          <p className="text-2xl font-medium tracking-tight">Drag to rank</p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            {supportsCustomOrder
-              ? "Saved cities appear on the dashboard in this exact order."
-              : "Saved cities still work. Run the reorder SQL migration to enable drag ranking."}
+            Saved cities appear on the dashboard in this exact order.
           </p>
-        </div>
-        <div className="card-shell-strong p-5">
-          <p className="eyebrow mb-2">Unit Preference</p>
+          <div className="mt-6 border-t border-[var(--border)] pt-4">
+            <p className="eyebrow mb-2">Unit Preference</p>
           <div className="mt-2 flex gap-3 text-sm">
             <button
               onClick={() => void updateUnit("fahrenheit")}
@@ -453,24 +477,7 @@ export function CityPreferences() {
               Celsius
             </button>
           </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-[var(--border)]">
-        <div>
-          <p className="eyebrow mb-2">City Catalog</p>
-          <h2 className="text-2xl font-medium tracking-tight">Registry</h2>
-        </div>
-
-        <div className="w-full max-w-sm">
-          <input
-            className="field w-full"
-            id="city-search"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search city or region"
-            type="search"
-            value={search}
-          />
+          </div>
         </div>
       </div>
 
@@ -486,9 +493,7 @@ export function CityPreferences() {
             <div>
               <p className="eyebrow mb-3">Saved</p>
               <p className="text-sm text-[var(--ink-soft)]">
-                {supportsCustomOrder
-                  ? "Your dashboard follows this order. Drag any saved city to move it up or down."
-                  : "Your saved cities are active. Drag ranking will appear after the reorder migration runs."}
+                Your dashboard follows this order. Drag any saved city to move it up or down.
               </p>
             </div>
             {reordering ? (
@@ -503,7 +508,7 @@ export function CityPreferences() {
             {savedCities.length > 0 ? (
               savedCities.map((city, index) => renderCityRow(city, true, index))
             ) : (
-              <div className="px-4 py-10 text-sm text-[var(--ink-soft)]">
+              <div className="px-6 py-10 text-sm text-[var(--ink-soft)]">
                 No saved cities yet. Add a few below to personalize your dashboard.
               </div>
             )}
@@ -516,17 +521,27 @@ export function CityPreferences() {
             <div>
               <p className="eyebrow mb-3">Add More</p>
               <p className="text-sm text-[var(--ink-soft)]">
-                Browse the remaining cities and add them to your dashboard.
+                Search the catalog and add more cities to your dashboard.
               </p>
+            </div>
+            <div className="w-full max-w-sm">
+              <input
+                className="field w-full"
+                id="city-search"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search city, region, or country"
+                type="search"
+                value={search}
+              />
             </div>
           </div>
 
           <div className="card-shell overflow-hidden">
-            <div className="mt-4 flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
+            <div className="flex flex-col divide-y divide-[var(--border)] border-b border-t border-[var(--border)]">
             {availableCities.length > 0 ? (
               availableCities.map((city) => renderCityRow(city, false))
             ) : (
-              <div className="px-4 py-10 text-sm text-[var(--ink-soft)]">
+              <div className="px-6 py-10 text-sm text-[var(--ink-soft)]">
                 No additional cities match your current search.
               </div>
             )}
