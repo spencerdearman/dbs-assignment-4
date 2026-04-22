@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "node --watch --env-file=.env index.js",
-    "start": "node --env-file=.env index.js"
+    "start": "sh -c 'if [ -f .env ]; then node --env-file=.env index.js; else node index.js; fi'"
   },
   "type": "module",
   "dependencies": {
