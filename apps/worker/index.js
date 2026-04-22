@@ -290,6 +290,8 @@ const POLL_INTERVAL_MINUTES = Number.parseInt(
   10,
 );
 const WORKER_ID = "open-meteo-worker";
+const WORKER_HEALTH_COLUMN = "consecutive_error_count";
+let supportsWorkerHealthColumns = true;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error(
@@ -373,15 +375,39 @@ async function fetchSnapshot(city) {
 }
 
 async function updateWorkerStatus(patch) {
-  const { error } = await supabase.from("worker_status").upsert(
-    {
-      id: WORKER_ID,
-      source_name: "open-meteo",
-      poll_interval_minutes: POLL_INTERVAL_MINUTES,
-      ...patch,
-    },
-    { onConflict: "id" },
-  );
+  const basePatch = {
+    id: WORKER_ID,
+    source_name: "open-meteo",
+    poll_interval_minutes: POLL_INTERVAL_MINUTES,
+    ...patch,
+  };
+
+  let payload = supportsWorkerHealthColumns
+    ? basePatch
+    : {
+        ...basePatch,
+        consecutive_error_count: undefined,
+      };
+
+  let { error } = await supabase
+    .from("worker_status")
+    .upsert(payload, { onConflict: "id" });
+
+  if (
+    error &&
+    supportsWorkerHealthColumns &&
+    error.message?.toLowerCase().includes(WORKER_HEALTH_COLUMN) &&
+    error.message?.toLowerCase().includes("does not exist")
+  ) {
+    supportsWorkerHealthColumns = false;
+    payload = {
+      ...basePatch,
+      consecutive_error_count: undefined,
+    };
+    ({ error } = await supabase
+      .from("worker_status")
+      .upsert(payload, { onConflict: "id" }));
+  }
 
   if (error) {
     throw error;
@@ -392,7 +418,6 @@ async function pollOnce() {
   const startedAt = new Date().toISOString();
   await updateWorkerStatus({
     last_run_at: startedAt,
-    last_error: null,
   });
 
   const results = await Promise.allSettled(CITY_CATALOG.map(fetchSnapshot));
@@ -419,6 +444,7 @@ async function pollOnce() {
   await updateWorkerStatus({
     last_run_at: startedAt,
     last_success_at: new Date().toISOString(),
+    consecutive_error_count: 0,
     last_error:
       failedCount > 0
         ? `${failedCount} city requests failed during the latest poll.`
@@ -434,6 +460,7 @@ async function run() {
   await syncCityCatalog();
   await updateWorkerStatus({
     poll_interval_minutes: POLL_INTERVAL_MINUTES,
+    consecutive_error_count: 0,
     last_error: "Worker initialized and waiting for first successful poll.",
   });
 
@@ -445,11 +472,23 @@ async function run() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown worker error";
+      const previousCount = supportsWorkerHealthColumns
+        ? await supabase
+            .from("worker_status")
+            .select("consecutive_error_count")
+            .eq("id", WORKER_ID)
+            .maybeSingle()
+        : null;
+      const nextErrorCount =
+        supportsWorkerHealthColumns && !previousCount?.error
+          ? (previousCount.data?.consecutive_error_count ?? 0) + 1
+          : undefined;
 
       console.error("[worker] poll failed:", message);
 
       await updateWorkerStatus({
         last_run_at: new Date().toISOString(),
+        consecutive_error_count: nextErrorCount,
         last_error: message,
       });
     }
@@ -465,6 +504,7 @@ run().catch(async (error) => {
   try {
     await updateWorkerStatus({
       last_run_at: new Date().toISOString(),
+      consecutive_error_count: supportsWorkerHealthColumns ? 1 : undefined,
       last_error: message,
     });
   } catch (statusError) {

@@ -12,6 +12,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", label: "Dashboard" },
     { href: "/my-cities", label: "My Cities" },
+    { href: "/health", label: "Health" },
   ];
 
   return (

@@ -61,6 +61,7 @@ create table if not exists public.worker_status (
   last_run_at timestamptz,
   last_success_at timestamptz,
   last_error text,
+  consecutive_error_count integer not null default 0,
   updated_at timestamptz not null default timezone('utc', now())
 );
 
@@ -164,13 +165,15 @@ insert into public.worker_status (
   id,
   source_name,
   poll_interval_minutes,
-  last_error
+  last_error,
+  consecutive_error_count
 )
 values (
   'open-meteo-worker',
   'open-meteo',
   15,
-  'Worker has not reported yet.'
+  'Worker has not reported yet.',
+  0
 )
 on conflict (id) do nothing;
 

@@ -332,29 +332,35 @@ export function WeatherDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
-          <p className="eyebrow">Unit</p>
-          <div className="flex gap-2 text-sm">
-            <button
-              onClick={() => void updatePreferredUnit("fahrenheit")}
-              className={`rounded-full border px-3 py-1.5 transition-colors ${
-                preferredUnit === "fahrenheit"
-                  ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
-              }`}
-            >
-              °F
-            </button>
-            <button
-              onClick={() => void updatePreferredUnit("celsius")}
-              className={`rounded-full border px-3 py-1.5 transition-colors ${
-                preferredUnit === "celsius"
-                  ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                  : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
-              }`}
-            >
-              °C
-            </button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Link className="button-secondary" href="/health">
+            View worker health
+          </Link>
+
+          <div className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3">
+            <p className="eyebrow">Unit</p>
+            <div className="flex gap-2 text-sm">
+              <button
+                onClick={() => void updatePreferredUnit("fahrenheit")}
+                className={`rounded-full border px-3 py-1.5 transition-colors ${
+                  preferredUnit === "fahrenheit"
+                    ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                    : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                }`}
+              >
+                °F
+              </button>
+              <button
+                onClick={() => void updatePreferredUnit("celsius")}
+                className={`rounded-full border px-3 py-1.5 transition-colors ${
+                  preferredUnit === "celsius"
+                    ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                    : "border-transparent text-[var(--ink-soft)] hover:text-[var(--ink)]"
+                }`}
+              >
+                °C
+              </button>
+            </div>
           </div>
         </div>
       </div>

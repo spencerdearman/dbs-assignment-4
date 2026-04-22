@@ -47,5 +47,6 @@ export type WorkerStatusRecord = {
   last_run_at: string | null;
   last_success_at: string | null;
   last_error: string | null;
+  consecutive_error_count?: number | null;
   updated_at: string;
 };
