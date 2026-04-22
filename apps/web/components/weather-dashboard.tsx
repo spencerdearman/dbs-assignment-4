@@ -17,7 +17,10 @@ import {
   formatWind,
   getCityLocalTime,
 } from "@/lib/weather";
-import { formatSupabaseRequestError } from "@/lib/supabase-browser";
+import {
+  formatSupabaseRequestError,
+  isMissingColumnError,
+} from "@/lib/supabase-browser";
 
 function snapshotMapFromRows(rows: WeatherSnapshotRecord[]) {
   return Object.fromEntries(rows.map((row) => [row.city_id, row]));
@@ -36,6 +39,42 @@ export function WeatherDashboard() {
   const [localUnit, setLocalUnit] = useState<TemperatureUnit>("fahrenheit");
   const [loading, setLoading] = useState(() => Boolean(supabase));
   const [error, setError] = useState<string | null>(null);
+
+  async function loadFavoriteRows() {
+    if (!supabase) {
+      return { data: [], error: null };
+    }
+
+    const orderedResult = await supabase
+      .from("user_city_preferences")
+      .select("city_id, sort_order, created_at")
+      .order("sort_order")
+      .order("created_at");
+
+    if (!orderedResult.error) {
+      return {
+        data: orderedResult.data ?? [],
+        error: null,
+      };
+    }
+
+    if (!isMissingColumnError(orderedResult.error.message, "sort_order")) {
+      return {
+        data: [],
+        error: orderedResult.error,
+      };
+    }
+
+    const fallbackResult = await supabase
+      .from("user_city_preferences")
+      .select("city_id, created_at")
+      .order("created_at");
+
+    return {
+      data: fallbackResult.data ?? [],
+      error: fallbackResult.error,
+    };
+  }
 
   const loadDashboard = useEffectEvent(async () => {
     if (!supabase) {
@@ -78,11 +117,7 @@ export function WeatherDashboard() {
 
     if (userId) {
       const [favoritesResult, profileResult] = await Promise.all([
-        supabase
-          .from("user_city_preferences")
-          .select("city_id, sort_order, created_at")
-          .order("sort_order")
-          .order("created_at"),
+        loadFavoriteRows(),
         supabase.from("user_profiles").select("*").maybeSingle(),
       ]);
 

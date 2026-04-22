@@ -40,6 +40,15 @@ export function formatSupabaseRequestError(
   return message;
 }
 
+export function isMissingColumnError(message: string | undefined, columnName: string) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return normalized.includes(columnName.toLowerCase()) && normalized.includes("does not exist");
+}
+
 export function createSupabaseBrowserClient(
   accessToken?: () => Promise<string | null>,
 ) {

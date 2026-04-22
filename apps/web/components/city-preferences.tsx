@@ -14,7 +14,10 @@ import type {
   TemperatureUnit,
   UserCityPreferenceRecord,
 } from "@/lib/types";
-import { formatSupabaseRequestError } from "@/lib/supabase-browser";
+import {
+  formatSupabaseRequestError,
+  isMissingColumnError,
+} from "@/lib/supabase-browser";
 
 export function CityPreferences() {
   const { hasEnv, isReady, isSignedIn, missingEnv, supabase, userId } =
@@ -29,10 +32,54 @@ export function CityPreferences() {
   const [dropTargetCityId, setDropTargetCityId] = useState<string | null>(null);
   const [reordering, setReordering] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [supportsCustomOrder, setSupportsCustomOrder] = useState(true);
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const deferredSearch = useDeferredValue(search);
+
+  async function loadFavoriteRows() {
+    if (!supabase) {
+      return {
+        data: [],
+        supportsCustomOrder: false,
+        error: null,
+      };
+    }
+
+    const orderedResult = await supabase
+      .from("user_city_preferences")
+      .select("city_id, sort_order, created_at")
+      .order("sort_order")
+      .order("created_at");
+
+    if (!orderedResult.error) {
+      return {
+        data: orderedResult.data ?? [],
+        supportsCustomOrder: true,
+        error: null,
+      };
+    }
+
+    if (!isMissingColumnError(orderedResult.error.message, "sort_order")) {
+      return {
+        data: [],
+        supportsCustomOrder: false,
+        error: orderedResult.error,
+      };
+    }
+
+    const fallbackResult = await supabase
+      .from("user_city_preferences")
+      .select("city_id, created_at")
+      .order("created_at");
+
+    return {
+      data: fallbackResult.data ?? [],
+      supportsCustomOrder: false,
+      error: fallbackResult.error,
+    };
+  }
 
   const loadPreferences = useEffectEvent(async () => {
     if (!supabase || !userId) {
@@ -44,11 +91,7 @@ export function CityPreferences() {
 
     const [citiesResult, favoritesResult, profileResult] = await Promise.all([
       supabase.from("cities").select("*").order("name"),
-      supabase
-        .from("user_city_preferences")
-        .select("city_id, sort_order, created_at")
-        .order("sort_order")
-        .order("created_at"),
+      loadFavoriteRows(),
       supabase.from("user_profiles").select("preferred_unit").maybeSingle(),
     ]);
 
@@ -71,13 +114,14 @@ export function CityPreferences() {
       setFavoriteIds(
         (favoritesResult.data ?? []).map((row) => row.city_id),
       );
+      setSupportsCustomOrder(favoritesResult.supportsCustomOrder);
       setPreferredUnit(profileResult.data?.preferred_unit ?? "fahrenheit");
       setLoading(false);
     });
   });
 
   async function persistFavoriteOrder(orderedCityIds: string[]) {
-    if (!supabase || !userId || orderedCityIds.length === 0) {
+    if (!supabase || !userId || orderedCityIds.length === 0 || !supportsCustomOrder) {
       return;
     }
 
@@ -126,10 +170,16 @@ export function CityPreferences() {
       : [...favoriteIds, cityId];
     const result = isFavorite
       ? await supabase.from("user_city_preferences").delete().eq("city_id", cityId)
-      : await supabase.from("user_city_preferences").insert({
-          city_id: cityId,
-          sort_order: favoriteIds.length,
-        });
+      : await supabase.from("user_city_preferences").insert(
+          supportsCustomOrder
+            ? {
+                city_id: cityId,
+                sort_order: favoriteIds.length,
+              }
+            : {
+                city_id: cityId,
+              },
+        );
 
     setBusyCityId(null);
 
@@ -142,7 +192,7 @@ export function CityPreferences() {
       setFavoriteIds(nextFavoriteIds);
     });
 
-    if (isFavorite && nextFavoriteIds.length > 0) {
+    if (isFavorite && nextFavoriteIds.length > 0 && supportsCustomOrder) {
       await persistFavoriteOrder(nextFavoriteIds);
     }
   }
@@ -284,7 +334,7 @@ export function CityPreferences() {
         } ${isDropTarget ? "bg-[var(--surface-strong)]" : "hover:bg-[var(--surface-strong)]"} ${
           isDragging ? "opacity-50" : ""
         }`}
-        draggable={isFavorite && !reordering}
+        draggable={isFavorite && supportsCustomOrder && !reordering}
         key={city.id}
         onDragEnd={() => {
           setDraggedCityId(null);
@@ -320,7 +370,7 @@ export function CityPreferences() {
             <div className="mb-3 flex items-center gap-3">
               <span className="eyebrow">#{(orderIndex ?? 0) + 1}</span>
               <span className="mono text-[0.65rem] tracking-wider text-[var(--ink-soft)]">
-                Drag to reorder
+                {supportsCustomOrder ? "Drag to reorder" : "Saved order"}
               </span>
             </div>
           ) : null}
@@ -370,9 +420,13 @@ export function CityPreferences() {
         </div>
         <div className="card-shell-strong p-5">
           <p className="eyebrow mb-2">Personal order</p>
-          <p className="text-2xl font-medium tracking-tight">Drag to rank</p>
+          <p className="text-2xl font-medium tracking-tight">
+            {supportsCustomOrder ? "Drag to rank" : "Migration needed"}
+          </p>
           <p className="mt-2 text-sm text-[var(--ink-soft)]">
-            Saved cities appear on the dashboard in this exact order.
+            {supportsCustomOrder
+              ? "Saved cities appear on the dashboard in this exact order."
+              : "Saved cities still work. Run the reorder SQL migration to enable drag ranking."}
           </p>
         </div>
         <div className="card-shell-strong p-5">
@@ -432,7 +486,9 @@ export function CityPreferences() {
             <div>
               <p className="eyebrow mb-3">Saved</p>
               <p className="text-sm text-[var(--ink-soft)]">
-                Your dashboard follows this order. Drag any saved city to move it up or down.
+                {supportsCustomOrder
+                  ? "Your dashboard follows this order. Drag any saved city to move it up or down."
+                  : "Your saved cities are active. Drag ranking will appear after the reorder migration runs."}
               </p>
             </div>
             {reordering ? (
